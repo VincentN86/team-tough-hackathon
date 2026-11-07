@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RushReady Kitchen Display</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%23ff8c1a%22/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-row">
+      <div class="brand">RushReady <span>KDS</span></div>
+      <div class="clock" id="clock" aria-label="Current time"></div>
+      <div class="summary" id="summary" aria-live="polite"></div>
+      <div class="resort" id="resort"></div>
+      <div class="top-actions">
+        <button class="btn ghost" id="rushToggle" type="button"></button>
+        <button class="btn ghost" id="soundToggle" type="button" aria-pressed="false"></button>
+        <button class="btn ghost" id="auditBtn" type="button">Audit log</button>
+        <button class="btn ghost" id="demoBtn" type="button">Demo tools</button>
+        <button class="btn employee" id="employeeBtn" type="button"></button>
+      </div>
+    </div>
+    <div class="voicebar">
+      <button class="ptt" id="ptt" type="button" aria-describedby="pttHint">
+        <span class="ptt-icon" aria-hidden="true"></span>
+        <span class="ptt-label">Hold to talk</span>
+      </button>
+      <div class="transcript-wrap">
+        <div class="transcript" id="transcript" aria-live="polite"></div>
+        <div class="hint" id="pttHint">Hold the button (or the Space bar) and say “Order 42, no onions satisfied”.</div>
+      </div>
+      <form class="typed" id="typedForm" autocomplete="off">
+        <label class="sr-only" for="typedInput">Type a voice command</label>
+        <input id="typedInput" type="text" placeholder="Type a command (testing)…" enterkeyhint="send">
+        <button class="btn" type="submit">Send</button>
+      </form>
+    </div>
+    <div class="pending" id="pending" hidden></div>
+  </header>
+
+  <main id="board">
+    <section class="lane lane-act" data-lane="act">
+      <div class="lane-head"><h2>Late / Start now</h2><span class="lane-count"></span><span class="lane-sub">Sorted by latest safe start time, not arrival</span></div>
+      <p class="lane-empty">Nothing needs to start right now.</p>
+      <div class="lane-grid"></div>
+    </section>
+    <section class="lane" data-lane="next">
+      <div class="lane-head"><h2>Up next</h2><span class="lane-count"></span><span class="lane-sub">Start Soon, then On Track</span></div>
+      <p class="lane-empty">Queue is empty.</p>
+      <div class="lane-grid"></div>
+    </section>
+    <section class="lane lane-cooking" data-lane="cooking">
+      <div class="lane-head"><h2>In progress</h2><span class="lane-count"></span><span class="lane-sub">Pinned in start order; these don't re-sort</span></div>
+      <p class="lane-empty">Nothing cooking.</p>
+      <div class="lane-grid"></div>
+    </section>
+    <section class="lane" data-lane="ready">
+      <div class="lane-head"><h2>Ready for pickup</h2><span class="lane-count"></span></div>
+      <p class="lane-empty">No orders waiting.</p>
+      <div class="lane-grid"></div>
+    </section>
+    <details class="lane lane-done" data-lane="done">
+      <summary class="lane-head"><h2>Completed &amp; cancelled</h2><span class="lane-count"></span></summary>
+      <p class="lane-empty">None yet.</p>
+      <div class="lane-grid"></div>
+    </details>
+  </main>
+
+  <div class="toasts" id="toasts" aria-live="assertive"></div>
+
+  <dialog id="loginDialog" class="dialog">
+    <form method="dialog" id="loginForm">
+      <h2>Who's on this station?</h2>
+      <p class="muted">Confirmations are recorded under your name.</p>
+      <div class="emp-grid" id="empGrid" role="radiogroup" aria-label="Employee"></div>
+      <label class="field">PIN <input id="loginPin" type="password" inputmode="numeric" maxlength="6" autocomplete="off"></label>
+      <p class="form-error" id="loginError" role="alert"></p>
+      <div class="dialog-actions">
+        <button class="btn ghost" type="button" id="signOutBtn">Sign out</button>
+        <button class="btn ghost" value="cancel" formnovalidate>Cancel</button>
+        <button class="btn primary" type="submit" id="loginSubmit">Sign in</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="allergyDialog" class="dialog dialog-allergy">
+    <div id="allergyBody"></div>
+    <button class="ptt" type="button" id="allergyPtt" hidden><span class="ptt-icon" aria-hidden="true"></span><span>Hold and say “confirm”</span></button>
+    <div class="dialog-actions">
+      <button class="btn ghost" type="button" id="allergyCancel">Cancel</button>
+      <button class="btn allergy-confirm" type="button" id="allergyConfirm">Confirm allergy handled</button>
+    </div>
+  </dialog>
+
+  <dialog id="ambiguityDialog" class="dialog">
+    <h2 id="ambiguityTitle"></h2>
+    <p class="muted">Tap the item you meant. Nothing has been checked yet.</p>
+    <div class="choice-list" id="ambiguityChoices"></div>
+    <div class="dialog-actions"><button class="btn ghost" type="button" id="ambiguityCancel">Cancel</button></div>
+  </dialog>
+
+  <dialog id="overrideDialog" class="dialog">
+    <form id="overrideForm">
+      <h2 id="overrideTitle">Manager override</h2>
+      <p class="muted">Marks the order Ready without every confirmation. The override is logged and flagged on the ticket.</p>
+      <ul class="override-list" id="overrideList"></ul>
+      <label class="field">Manager <select id="overrideManager"></select></label>
+      <label class="field">Manager PIN <input id="overridePin" type="password" inputmode="numeric" maxlength="6" autocomplete="off"></label>
+      <label class="field">Reason (required) <textarea id="overrideReason" rows="2" placeholder="e.g. Checked the bag myself with the customer at the counter"></textarea></label>
+      <p class="form-error" id="overrideError" role="alert"></p>
+      <div class="dialog-actions">
+        <button class="btn ghost" type="button" id="overrideCancel">Cancel</button>
+        <button class="btn warn" type="submit">Override &amp; mark Ready</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="auditDialog" class="dialog dialog-wide">
+    <div class="audit-head">
+      <h2>Audit log</h2>
+      <label class="field inline">Show
+        <select id="auditFilter">
+          <option value="all">Everything</option>
+          <option value="confirm">Confirmations &amp; undos</option>
+          <option value="flags">Overrides, updates, resets</option>
+          <option value="voice">Voice rejections</option>
+        </select>
+      </label>
+      <button class="btn ghost" type="button" id="auditClose">Close</button>
+    </div>
+    <div class="audit-scroll"><table class="audit"><thead><tr><th>Time</th><th>Event</th><th>Order</th><th>Item</th><th>Who</th><th>Method</th><th>Transcript / detail</th></tr></thead><tbody id="auditBody"></tbody></table></div>
+  </dialog>
+
+  <dialog id="demoDialog" class="dialog dialog-wide">
+    <div class="audit-head"><h2>Demo tools</h2><button class="btn ghost" type="button" id="demoClose">Close</button></div>
+    <div class="demo-grid">
+      <section>
+        <h3>Clock and orders</h3>
+        <div class="demo-buttons" id="demoActions"></div>
+      </section>
+      <section>
+        <h3>Try a command</h3>
+        <p class="muted">Tap one to run it as a typed command.</p>
+        <div class="demo-buttons" id="demoCommands"></div>
+      </section>
+    </div>
+  </dialog>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

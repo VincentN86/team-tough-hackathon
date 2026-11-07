@@ -55,6 +55,10 @@ API source documents:
 5. **Cook and Packer:** Resolve the incident, mark each item ready, tick packer checkboxes, manually confirm any modifiers and allergies, then seal the order.
 6. **Front Desk:** Mark the packed order handed off.
 
+## Kitchen Display (Smart Food Prioritizer)
+
+`kitchen-display/` is a standalone browser prototype. It ranks tickets by latest safe start time and handles modifier and allergy confirmation by tap or push-to-talk voice, with an audit log. No dependencies. Run `cd kitchen-display && npm test`, then `python3 -m http.server 8080`. See `kitchen-display/README.md`.
+
 ## Architecture
 
 - `app.py`: Streamlit interface: Intake, Cook, Packer, Front Desk, Workflow.
