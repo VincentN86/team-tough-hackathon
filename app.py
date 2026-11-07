@@ -1,4 +1,4 @@
-"""RushReady NOVA 2026 — Front House demo.
+"""BREADY NOVA 2026 — Front House demo.
 Run with: python3 -m streamlit run app.py
 """
 from datetime import datetime, timezone
@@ -12,11 +12,14 @@ from scheduler import schedule,batch_hints
 from ai_agent import parse_issue,transcribe_wav,inspect_packing_photo
 from intake import render_intake
 
-st.set_page_config(page_title='RushReady • NOVA 2026',page_icon='🍔',layout='wide')
+st.set_page_config(page_title='BREADY • NOVA 2026',page_icon='🍞',layout='wide',initial_sidebar_state='collapsed')
 init_db()
 
 st.markdown('''<style>
-.block-container {max-width: 1360px; padding-top: 1.6rem;}
+.block-container {max-width: 1360px; padding-top: 3.5rem; padding-bottom: 1rem;}
+[data-testid="stAppViewContainer"] {background: #f7f6f2; color: #1d2227;}
+[role="tab"][aria-selected="true"] {color: #a94f28;}
+[data-baseweb="tab-highlight"] {background: #c7683c;}
 [data-testid="stMetric"]{border:1px solid #dae1e5; border-radius:12px; padding:12px;}
 </style>''',unsafe_allow_html=True)
 
@@ -28,7 +31,7 @@ except (FileNotFoundError,KeyError):
     default_model='openrouter/auto'
 
 with st.sidebar:
-    st.title('⚙️ RushReady')
+    st.title('BREADY')
     st.caption('NOVA hackathon • Fictional order data')
     KEY=os.environ.get('OPENROUTER_API_KEY','') or configured
     if KEY:
@@ -48,8 +51,6 @@ with st.sidebar:
     if st.button('Refresh', use_container_width=True):
         st.rerun()
 
-st.title('🍔 RushReady')
-st.caption('One order feed. Smarter kitchen priorities. Safer handoffs.  •  DEMO ONLY — no live DoorDash/Uber Eats integrations or customer notifications.')
 
 
 def clock(t):
@@ -87,7 +88,7 @@ def incident_summary(o):
     return '; '.join(result)
 
 
-tabs=st.tabs(['📥 Order Intake','👨‍🍳 Cook & AI Agent','📦 Packer','🛎️ Front Desk','📊 Workflow'])
+tabs=st.tabs(['Order Intake','Cook & AI Agent','Packer','Front Desk','Workflow'])
 
 with tabs[0]:
     render_intake()

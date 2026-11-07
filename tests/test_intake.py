@@ -191,6 +191,8 @@ def test_queue_selection_filters_and_empty_state(demo, monkeypatch):
     at = AppTest.from_string('from intake import render_intake\nrender_intake()').run()
     at.button(key='view_1042').click().run()
     assert at.session_state['dispatch_selected'] == '1042'
+    next(b for b in at.button if b.label == 'Back to orders').click().run()
+    assert 'dispatch_modal' not in at.session_state
     at.get('button_group')[0].set_value('DoorDash').run()
     at.run()
     assert at.session_state['dispatch_source'] == 'DoorDash'
@@ -201,7 +203,7 @@ def test_queue_selection_filters_and_empty_state(demo, monkeypatch):
     at.run()
     assert at.session_state['dispatch_selected'] == '1042'
     at.text_input(key='dispatch_search').input('1043').run()
-    assert at.session_state['dispatch_selected'] == '1043'
+    assert at.session_state['dispatch_selected'] == '1042'  # Filtering does not silently select another order.
     at.text_input(key='dispatch_search').input('no such order').run()
     assert any('No matching orders' in e.value for e in at.markdown)
     assert not at.exception
@@ -220,3 +222,27 @@ def test_new_order_does_not_clear_front_desk_drafts(demo):
     next(b for b in at.button if b.label == '+ New order').click().run()
     assert at.session_state['draft_1042'] == 'Front Desk message in progress'
     assert not at.exception
+
+
+def test_details_complete_and_missing_order(demo):
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_string("from intake import render_order_details\nrender_order_details()")
+    at.session_state['dispatch_selected'] = '1044'
+    at.run()
+    html = '\n'.join(e.value for e in at.markdown)
+    for text in ['1044', 'In-person POS', 'Salad', 'Drink', 'No nuts', 'Nut allergy', 'Received', 'Pickup deadline', 'Queued']:
+        assert text in html
+    assert not at.exception
+    at.session_state['dispatch_selected'] = 'missing'
+    at.run()
+    assert at.info[0].value == 'This order is no longer available.'
+
+
+def test_row_label_has_only_six_fields_and_escapes_markdown(demo):
+    from intake import queue_row_label
+    order = deepcopy(demo[0])
+    order['recipient'] = '[click](https://example.com) <b>name</b>'
+    label = queue_row_label(order)
+    assert len(label.split('\n\n')) == 6
+    assert '[click](' not in label
+    assert '<b>' not in label

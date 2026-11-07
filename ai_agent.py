@@ -11,7 +11,7 @@ BASE='https://openrouter.ai/api/v1'
 def _request(endpoint,key,body,timeout=30):
     response=requests.post(BASE+endpoint, headers={
         'Authorization': f'Bearer {key}', 'Content-Type':'application/json',
-        'X-OpenRouter-Title':'RushReady NOVA'}, json=body, timeout=timeout)
+        'X-OpenRouter-Title':'BREADY NOVA'}, json=body, timeout=timeout)
     if not response.ok:
         raise RuntimeError(f'OpenRouter HTTP {response.status_code}; check your allowed models and credit balance.')
     return response.json()

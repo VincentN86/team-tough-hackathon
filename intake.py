@@ -1,4 +1,4 @@
-"""RushReady Dispatch: isolated intake UI, using the shared order contract."""
+"""BREADY Dispatch: isolated intake UI, using the shared order contract."""
 from collections import Counter
 from datetime import datetime, timezone
 from html import escape
@@ -107,18 +107,17 @@ def ticket_html(order):
     )
 
 
-def queue_row_html(order):
-    deadline, tone = pickup_state(order)
-    summary = ' · '.join(f'{i["quantity"]}× {i["name"]}' for i in order['items'])
-    notes = ' · Allergy instructions' if any(i['allergy'].strip() for i in order['items']) else ''
-    return (f'<div class="dispatch-row"><div class="dispatch-row-top"><b>#{escape(str(order["id"]))}</b>'
-            f'<span class="dispatch-channel"><span>{escape(SOURCE_MARKS.get(order["source"], "—"))}</span>'
-            f' {escape(order["source"])}</span><span class="dispatch-row-status">'
-            f'{escape(STATUS_LABELS.get(order["status"], order["status"]))}</span></div>'
-            f'<div class="dispatch-row-recipient">{escape(order["recipient"])}</div>'
-            f'<div class="dispatch-row-summary">{escape(summary)}</div>'
-            f'<div class="dispatch-row-bottom"><span class="{tone}">{deadline}</span>'
-            f'<span>{notes}</span></div></div>')
+def queue_row_label(order):
+    """Six text paragraphs in a single native button; user text cannot add links."""
+    def plain(value):
+        value = ' '.join(str(value).split())
+        for char in r'\`*_{}[]<>()#+-.!|':
+            value = value.replace(char, '\\' + char)
+        return value
+    fields = [f'#{order["id"]}', order['source'], order['recipient'],
+              ' · '.join(f'{i["quantity"]}× {i["name"]}' for i in order['items']),
+              STATUS_LABELS.get(order['status'], order['status']), pickup_state(order)[0]]
+    return '\n\n'.join(plain(field) for field in fields)
 
 
 def clear_filters():
@@ -130,11 +129,29 @@ def clear_filters():
 
 def show_created():
     clear_filters()
-    st.session_state['dispatch_selected'] = st.session_state['dispatch_created']
+    select_order(st.session_state['dispatch_created'])
 
 
 def select_order(order_id):
     st.session_state['dispatch_selected'] = order_id
+    st.session_state['dispatch_modal'] = 'details'
+
+
+def close_order_dialog():
+    st.session_state.pop('dispatch_modal', None)
+
+
+def render_order_details():
+    order = next((o for o in fetch_orders()
+                  if o['id'] == st.session_state.get('dispatch_selected')), None)
+    with st.container(key='dispatch_dialog'):
+        if order is None:
+            st.info('This order is no longer available.')
+        else:
+            st.markdown(ticket_html(order), unsafe_allow_html=True)
+        if st.button('Back to orders', use_container_width=True):
+            close_order_dialog()
+            st.rerun()
 
 
 def prepare_order(draft):
@@ -207,6 +224,7 @@ def render_creation():
                     draft['saved'] = new_id
                     st.session_state['dispatch_created'] = new_id
                     st.session_state['dispatch_selected'] = new_id
+                    close_order_dialog()
                     st.rerun()
             return
         st.markdown('#### 1 / Order details')
@@ -235,9 +253,12 @@ def render_creation():
         st.button('Review order', type='primary', use_container_width=True, on_click=review_draft)
 
 
-@st.dialog('New order', width='large')
-def new_order_dialog():
-    render_creation()
+@st.dialog('BREADY · Order', width='large')
+def order_dialog(kind):
+    if kind == 'new':
+        render_creation()
+    else:
+        render_order_details()
 
 
 @st.fragment(run_every='5s')
@@ -260,40 +281,26 @@ def render_feed():
                             st.session_state.get('dispatch_status', 'All'),
                             st.session_state.get('dispatch_search', ''),
                             st.session_state.get('dispatch_sort', 'Newest first'))
-    selected = choose_selection(visible, st.session_state.get('dispatch_selected'))
-    if selected:
-        st.session_state['dispatch_selected'] = selected['id']
-    queue, detail = st.columns([1.55, 1], gap='medium')
-    with queue:
-        st.markdown(f'<div class="dispatch-section-heading">Queue <span>{len(visible)} of {len(orders)} orders</span></div>', unsafe_allow_html=True)
-        with st.container(height=590, border=False, key='dispatch_queue'):
-            if not visible:
-                st.markdown('<div class="dispatch-empty"><h3>' + ('No orders yet' if not orders else 'No matching orders')
-                            + '</h3><p>' + ('Use + New order to start a ticket.' if not orders else 'Change the channel or clear your filters.')
-                            + '</p></div>', unsafe_allow_html=True)
-            for order in visible:
-                is_selected = selected['id'] == order['id']
-                with st.container(key=f'ticket_{"selected" if is_selected else "idle"}_{order["id"]}'):
-                    content, action = st.columns([5, 1.3], vertical_alignment='center')
-                    content.markdown(queue_row_html(order), unsafe_allow_html=True)
-                    action.button('Selected' if is_selected else 'View', key=f'view_{order["id"]}',
-                                  help=f'View order #{order["id"]}', use_container_width=True,
-                                  disabled=is_selected, on_click=select_order, args=(order['id'],))
-    with detail:
-        st.markdown('<div class="dispatch-section-heading">Ticket detail <span>Read only</span></div>', unsafe_allow_html=True)
-        with st.container(height=590, border=False, key='dispatch_detail'):
-            if selected:
-                st.markdown(ticket_html(selected), unsafe_allow_html=True)
-            else:
-                st.markdown('<div class="dispatch-empty"><h3>Your ticket appears here</h3><p>Select an order from the queue.</p></div>', unsafe_allow_html=True)
-    st.caption('Ready = ready to pack or packed · Due soon = within 10 min or overdue · Counts include all channels')
+    st.markdown(f'<div class="dispatch-section-heading">Order queue <span>{len(visible)} of {len(orders)} · Select a row for details</span></div>', unsafe_allow_html=True)
+    st.markdown('<div class="dispatch-columns"><span>Order</span><span>Source</span><span>Recipient</span><span>Items</span><span>Status</span><span>Pickup</span></div>', unsafe_allow_html=True)
+    with st.container(height=350, border=False, key='dispatch_queue'):
+        if not visible:
+            st.markdown('<div class="dispatch-empty"><h3>' + ('No orders yet' if not orders else 'No matching orders')
+                        + '</h3><p>' + ('Use + New order to start a ticket.' if not orders else 'Change the channel or clear your filters.')
+                        + '</p></div>', unsafe_allow_html=True)
+        for order in visible:
+            tone = pickup_state(order)[1]
+            with st.container(key=f'ticket_{tone}_{order["id"]}'):
+                if st.button(queue_row_label(order), key=f'view_{order["id"]}',
+                             use_container_width=True, on_click=select_order, args=(order['id'],)):
+                    st.rerun()
 
 
 def render_intake():
     st.markdown('<style>' + Path(__file__).with_name('intake.css').read_text() + '</style>', unsafe_allow_html=True)
     with st.container(key='dispatch'):
         heading, action = st.columns([4, 1], vertical_alignment='center')
-        heading.markdown('<div class="dispatch-identity">RUSHREADY <span>/ DISPATCH</span></div>'
+        heading.markdown('<div class="dispatch-identity">BREADY <span>/ DISPATCH</span></div>'
                          '<h2 class="dispatch-title">Incoming orders</h2>'
                          '<div class="dispatch-live"><i></i> Updates every 5s <span> / Simulated channels</span></div>', unsafe_allow_html=True)
         if action.button('+ New order', type='primary', use_container_width=True):
@@ -302,7 +309,7 @@ def render_intake():
                 for key in list(st.session_state):
                     if key.startswith('dispatch_draft_'):
                         del st.session_state[key]
-            new_order_dialog()
+            st.session_state['dispatch_modal'] = 'new'
         if st.session_state.get('dispatch_created'):
             message, show = st.columns([4, 1], vertical_alignment='center')
             message.markdown(f'<div class="dispatch-saved">Order #{escape(str(st.session_state["dispatch_created"]))} created · Sent to kitchen</div>', unsafe_allow_html=True)
@@ -318,3 +325,8 @@ def render_intake():
             sort.selectbox('Sort', SORT_OPTIONS, key='dispatch_sort')
             clear.button('Clear filters', on_click=clear_filters, use_container_width=True)
         render_feed()
+
+    if st.session_state.get('dispatch_modal'):
+        # Consume the open request once. Native dismissal cannot reopen a stale
+        # dialog on a later rerun; no newer Streamlit on_dismiss API is required.
+        order_dialog(st.session_state.pop('dispatch_modal'))
