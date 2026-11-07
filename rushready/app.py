@@ -10,6 +10,8 @@ from database import (MENU,SOURCES,RECIPIENTS,STATIONS,init_db,reset_demo,create
                       verify_special,seal_order,handoff_order,add_incident,resolve_incident)
 from scheduler import schedule,batch_hints
 from ai_agent import parse_issue,transcribe_wav,inspect_packing_photo
+from roles import ensure_role_selected,run_app          # role-based navigation (integration layer)
+from features.communication import reset_feature_data   # Feature 3 (Liz): clears its tables on demo reset
 
 st.set_page_config(page_title='RushReady • NOVA 2026',page_icon='🍔',layout='wide')
 init_db()
@@ -41,12 +43,14 @@ with st.sidebar:
     st.divider()
     if st.button('Reset demo restaurant',use_container_width=True):
         reset_demo()
+        reset_feature_data()
         for k in ['issue_preview','chef_report_text','photo_result']:
             st.session_state.pop(k,None)
         st.rerun()
     if st.button('Refresh', use_container_width=True):
         st.rerun()
 
+ensure_role_selected()  # welcome screen: pick Kitchen or Front Desk (stops here until chosen)
 st.title('🍔 RushReady')
 st.caption('One order feed. Smarter kitchen priorities. Safer handoffs.  •  DEMO ONLY — no live DoorDash/Uber Eats integrations or customer notifications.')
 
@@ -86,9 +90,9 @@ def incident_summary(o):
     return '; '.join(result)
 
 
-tabs=st.tabs(['📥 Order Intake','👨‍🍳 Cook & AI Agent','📦 Packer','🛎️ Front Desk','📊 Workflow'])
+# Each former tab is now a plain function (bodies unchanged). roles.py decides which role shows which screens.
 
-with tabs[0]:
+def screen_intake():  # was: with tabs[0]  (Feature 1: order intake)
     left,right=st.columns([1,1.6],gap='large')
     with left:
         st.subheader('Simulate a new order')
@@ -125,7 +129,7 @@ with tabs[0]:
                         st.warning('ALLERGY INSTRUCTIONS: Staff must verify')
         intake_feed()
 
-with tabs[1]:
+def screen_cook():  # was: with tabs[1]  (Feature 2: kitchen queue/prioritization)
     st.subheader('Kitchen tickets — ranked by deadline risk')
     st.caption('Priority uses estimated latest-start times, not simple arrival order. Each station processes one ticket line at a time in this demo.')
     station_filter=st.selectbox('Cooking station', ['All stations']+STATIONS)
@@ -167,7 +171,9 @@ with tabs[1]:
                         if st.button('✓ Ready',key=f"ready_{it['id']}",disabled=it['status']=='ready',use_container_width=True):
                             update_item(it['id'],'ready');st.rerun()
     cook_queue()
-    st.divider()
+
+
+def screen_legacy_agent():  # Vincent's original typed chef report (moved out of screen_cook; code unchanged)
     st.subheader('🤖 Chef → Server communication agent')
     st.write('Report an unavailable ingredient or a kitchen station delay. Review AI interpretation before applying it.')
     if 'chef_report_text' not in st.session_state:
@@ -219,7 +225,7 @@ with tabs[1]:
                 resolve_incident(i['id']);st.rerun()
     active_incidents()
 
-with tabs[2]:
+def screen_packer():  # was: with tabs[2]  (Feature 4: packing verification)
     st.subheader('Packing verification')
     st.caption('A human packer checks each item. Photos do not verify sealed containers, hidden modifiers, or allergens.')
     @st.fragment(run_every='5s')
@@ -274,7 +280,7 @@ with tabs[2]:
             st.info(st.session_state.photo_result)
             st.caption('Photo analysis is only a suggestion. Employee sign-off is always required.')
 
-with tabs[3]:
+def screen_front_desk():  # was: with tabs[3]  (pickup / handoff)
     st.subheader('Server / front desk — pickup coordination')
     @st.fragment(run_every='5s')
     def front_desk():
@@ -308,7 +314,7 @@ with tabs[3]:
         st.caption('No SMS, push notification, DoorDash, or Uber Eats message is actually sent. This screen prepares staff-facing drafts.')
     front_desk()
 
-with tabs[4]:
+def screen_notes():  # was: with tabs[4]
     st.subheader('System implementation notes')
     st.markdown('''
     **Order lifecycle:** Incoming → Cooking → Ready to pack → Staff verified/packed → Handed off.
@@ -326,3 +332,8 @@ with tabs[4]:
     on one running instance but does not guarantee persistence on hosted servers.
     ''')
     st.code('python3 -m pip install -r requirements.txt\npython3 -m streamlit run app.py',language='bash')
+
+
+# ---- ROLE-BASED APP: Kitchen vs Front Desk (see roles.py). Feature 3 is plugged in there. ----
+run_app({'cook':screen_cook,'legacy_agent':screen_legacy_agent,'intake':screen_intake,'packer':screen_packer,
+         'front_desk':screen_front_desk,'notes':screen_notes},KEY,MODEL)

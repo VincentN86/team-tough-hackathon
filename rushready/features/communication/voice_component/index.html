@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 4px; color: #1c2430; }
+  .row { display: flex; gap: 12px; align-items: stretch; }
+  #btn { flex: 0 0 46%; min-height: 96px; font-size: 1.35rem; font-weight: 700; border: 0; border-radius: 16px;
+         background: #1f6feb; color: #fff; cursor: pointer; }
+  #btn.on { background: #d32f2f; animation: pulse 1.4s infinite; }
+  #btn:disabled { background: #98a2b3; cursor: not-allowed; }
+  #panel { flex: 1; min-width: 0; }
+  #status { font-weight: 700; margin-bottom: 4px; }
+  #dot { display:inline-block; width:11px; height:11px; border-radius:50%; background:#98a2b3; margin-right:6px; }
+  #btn.on ~ #panel #dot { background: #d32f2f; }
+  #live { min-height: 40px; padding: 8px; border: 1px solid #d9dde3; border-radius: 10px; background: #fafbfc; font-size: .95rem; }
+  .err { color: #c62828; margin-top: 6px; font-size: .9rem; }
+  .muted { color: #667085; font-size: .78rem; margin-top: 6px; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(211,47,47,.5) } 50% { box-shadow: 0 0 0 14px rgba(211,47,47,0) } }
+</style>
+</head>
+<body>
+<!-- FEATURE 3 microphone. Edit this file to change the button, labels or listening behaviour.
+     It talks to Streamlit with postMessage (no build step). Every FINISHED sentence is sent immediately. -->
+<div class="row">
+  <button id="btn">🎤 Start Listening</button>
+  <div id="panel">
+    <div id="status"><span id="dot"></span><span id="stext">Microphone OFF</span></div>
+    <div id="live">Say it naturally, e.g. “We're out of chicken and the fryer is ten minutes behind.”</div>
+    <div id="err" class="err"></div>
+  </div>
+</div>
+<div class="muted">Hands-free while ON: finished sentences are processed automatically; chit-chat is ignored. Tap Pause any time.
+  Works only while this page is open. Chrome/Edge may send audio to their speech service. Not always-on listening.</div>
+<script>
+  function send(type, data) { window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type: type }, data), '*'); }
+  send('streamlit:componentReady', { apiVersion: 1 });
+  send('streamlit:setFrameHeight', { height: 175 });
+
+  var btn = document.getElementById('btn'), stext = document.getElementById('stext');
+  var live = document.getElementById('live'), errEl = document.getElementById('err');
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var rec = null, want = false, utterances = [], seq = 0;
+  var MESSAGES = {
+    'not-allowed': 'Microphone permission denied. Allow it in the browser address bar, or type the report below.',
+    'service-not-allowed': 'Microphone is blocked for this page. Type the report below.',
+    'audio-capture': 'No microphone found. Type the report below.',
+    'network': 'Speech recognition needs a network connection. Type the report below.'
+  };
+  if (!SR) { btn.disabled = true; errEl.textContent = "This browser doesn't support speech recognition (use Chrome or Edge). Type the report below."; }
+
+  function ui(on) {
+    btn.className = on ? 'on' : '';
+    btn.textContent = on ? '⏸ Pause Listening' : '🎤 Start Listening';
+    stext.textContent = on ? 'Microphone ON — listening…' : 'Microphone OFF';
+  }
+  function emit() { send('streamlit:setComponentValue', { value: { utterances: utterances.slice(-20) }, dataType: 'json' }); }
+
+  function begin() {
+    rec = new SR();
+    rec.continuous = true; rec.interimResults = true; rec.lang = 'en-US';
+    rec.onresult = function (e) {
+      var interim = '';
+      for (var i = e.resultIndex; i < e.results.length; i++) {
+        var t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) {
+          t = t.trim();
+          if (t) { utterances.push({ id: Date.now() + '-' + (seq++), text: t }); live.textContent = '✔ ' + t; emit(); }
+        } else { interim += t; }
+      }
+      if (interim) live.textContent = '… ' + interim;
+    };
+    rec.onerror = function (e) {
+      if (e.error === 'no-speech' || e.error === 'aborted') return;   // normal; we restart below
+      errEl.textContent = MESSAGES[e.error] || ('Speech error: ' + e.error + '. Type the report instead.');
+      want = false; ui(false);
+    };
+    // Browsers end a session after a quiet spell. Restart so the chef doesn't have to click again.
+    rec.onend = function () { if (want) setTimeout(function () { try { begin(); } catch (x) {} }, 300); else ui(false); };
+    try { rec.start(); ui(true); } catch (x) { errEl.textContent = 'Could not start the microphone. Type the report instead.'; want = false; ui(false); }
+  }
+  btn.onclick = function () {
+    if (want) { want = false; try { rec.stop(); } catch (x) {} ui(false); return; }
+    errEl.textContent = ''; want = true; begin();
+  };
+</script>
+</body>
+</html>
