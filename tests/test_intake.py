@@ -1,5 +1,6 @@
 """Feature 1 regression checks. All writes use a temporary SQLite database."""
 import sys
+from datetime import datetime, timedelta, timezone
 from copy import deepcopy
 from pathlib import Path
 
@@ -7,8 +8,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import database
-from intake import (SOURCE_COLORS, STATUS_LABELS, filter_orders, order_card,
-                    recipient_label, summarize_orders)
+from intake import (SOURCE_MARKS, STATUS_LABELS, filter_orders, ticket_html,
+                    recipient_label, summarize_orders, pickup_state, choose_selection)
 from scheduler import schedule
 
 
@@ -34,8 +35,8 @@ def test_every_source_persists_and_is_identified(demo, source):
     item = order['items'][0]
     assert (item['quantity'], item['modifier'], item['allergy']) == (2, 'No onions', 'Check bun ingredients')
     assert item['station'] == 'Grill' and item['prep_minutes'] == 10
-    assert source in SOURCE_COLORS
-    assert source in order_card(order)
+    assert source in SOURCE_MARKS
+    assert source in ticket_html(order)
     assert order_id in {o['id'] for o in filter_orders(records, source=source)}
 
 
@@ -107,7 +108,7 @@ def test_cards_escape_input(demo):
     order = deepcopy(demo[0])
     order['recipient'] = '<script>alert(1)</script>'
     order['items'][0]['modifier'] = '<img src=x onerror=alert(1)>'
-    html = order_card(order)
+    html = ticket_html(order)
     assert '<script>' not in html and '<img' not in html
     assert '&lt;script&gt;' in html and '&lt;img' in html
 
@@ -116,33 +117,106 @@ def test_intake_ui_submission_and_reruns(demo):
     from streamlit.testing.v1 import AppTest
 
     # Test only Feature 1; do not load app.py or access its secret configuration.
-    at = AppTest.from_string('from intake import render_intake\nrender_intake()').run()
+    # AppTest runs full scripts, not dialog fragment reruns. Test the dialog's
+    # content directly; the actual modal is checked in the browser preview.
+    at = AppTest.from_string('from intake import render_creation\nrender_creation()').run()
     assert not at.exception
 
     def by_label(elements, label):
         return next(element for element in elements if element.label == label)
 
-    by_label(at.button, 'Create incoming order').click().run()
-    assert at.warning
+    by_label(at.button, 'Review order').click().run()
+    assert at.error
     assert database.fetch_orders() == demo
     by_label(at.text_input, 'Recipient name').input('Taylor')
     by_label(at.selectbox, 'Order source').select('Website')
-    by_label(at.number_input, 'Burger').set_value(2)
+    by_label(at.multiselect, 'Menu items').select('Burger').run()
+    assert not at.exception
+    assert not any('Pizza' in e.label for e in at.text_input)
+    by_label(at.number_input, 'Burger quantity').set_value(2)
     by_label(at.text_input, 'Burger modification').input('No onions')
-    by_label(at.button, 'Create incoming order').click().run()
+    by_label(at.button, 'Review order').click().run()
+    assert not at.exception
+    assert len(database.fetch_orders()) == 4
+    by_label(at.button, 'Back to edit').click().run()
+    assert by_label(at.text_input, 'Recipient name').value == 'Taylor'
+    assert by_label(at.number_input, 'Burger quantity').value == 2
+    assert by_label(at.text_input, 'Burger modification').value == 'No onions'
+    by_label(at.button, 'Review order').click().run()
+    by_label(at.button, 'Create order').click().run()
     assert not at.exception
     assert len(database.fetch_orders()) == 5
     assert any('1046' in element.value for element in at.success)
-    assert any('Taylor' in element.value for element in at.markdown)
-    assert not any(element.label == 'Create incoming order' for element in at.button)
+    assert database.fetch_orders()[-1]['recipient'] == 'Taylor · Pickup customer'
+    assert not any(element.label == 'Create order' for element in at.button)
     for _ in range(2):
         at.run()
     assert len(database.fetch_orders()) == 5
-    by_label(at.selectbox, 'Source').select('DoorDash').run()
-    assert by_label(at.selectbox, 'Source').value == 'DoorDash'
+    del at.session_state['dispatch_draft']
     at.run()
-    assert by_label(at.selectbox, 'Source').value == 'DoorDash'
-    by_label(at.button, 'Start another order').click().run()
     assert by_label(at.text_input, 'Recipient name').value == ''
-    assert by_label(at.number_input, 'Burger').value == 0
+    assert by_label(at.multiselect, 'Menu items').value == []
     assert len(database.fetch_orders()) == 5
+
+
+def test_deadlines_are_independent_from_status(demo):
+    now = datetime.now(timezone.utc)
+    order = deepcopy(demo[0])
+    order['pickup_at'] = (now + timedelta(minutes=10)).isoformat()
+    assert pickup_state(order, now) == ('Pickup in 10m', 'soon')
+    order['pickup_at'] = (now + timedelta(minutes=11)).isoformat()
+    assert pickup_state(order, now)[1] == 'quiet'
+    order['status'] = 'packed'
+    order['pickup_at'] = (now - timedelta(minutes=3)).isoformat()
+    assert pickup_state(order, now) == ('Overdue 3m', 'overdue')
+    order['status'] = 'handed_off'
+    assert pickup_state(order, now) == ('Handed off', 'quiet')
+
+
+def test_status_groups_and_selection(demo):
+    records = deepcopy(demo)
+    for order, status in zip(records, ['cooking', 'ready_to_pack', 'packed', 'handed_off']):
+        order['status'] = status
+    assert {o['id'] for o in filter_orders(records, status='Ready')} == {'1043', '1044'}
+    assert filter_orders(records, status='In progress')[0]['id'] == '1042'
+    assert filter_orders(records, status='Completed')[0]['id'] == '1045'
+    assert choose_selection(records, '1043')['id'] == '1043'
+    assert choose_selection(list(reversed(records)), '1043')['id'] == '1043'
+    assert choose_selection([], '1043') is None
+    assert choose_selection(records, 'gone') == records[0]
+
+
+def test_queue_selection_filters_and_empty_state(demo, monkeypatch):
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_string('from intake import render_intake\nrender_intake()').run()
+    at.button(key='view_1042').click().run()
+    assert at.session_state['dispatch_selected'] == '1042'
+    at.get('button_group')[0].set_value('DoorDash').run()
+    at.run()
+    assert at.session_state['dispatch_source'] == 'DoorDash'
+    at.get('button_group')[0].set_value('All Sources').run()
+    at.run()
+    assert at.session_state['dispatch_selected'] == '1042'
+    database.create_order('Phone', 'Pickup customer', 25, [('Drink', 1, '', '')])
+    at.run()
+    assert at.session_state['dispatch_selected'] == '1042'
+    at.text_input(key='dispatch_search').input('1043').run()
+    assert at.session_state['dispatch_selected'] == '1043'
+    at.text_input(key='dispatch_search').input('no such order').run()
+    assert any('No matching orders' in e.value for e in at.markdown)
+    assert not at.exception
+    import intake
+    monkeypatch.setattr(intake, 'fetch_orders', lambda: [])
+    at.run()
+    assert any('No orders yet' in e.value for e in at.markdown)
+    assert not at.exception
+
+
+def test_new_order_does_not_clear_front_desk_drafts(demo):
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_string('from intake import render_intake\nrender_intake()').run()
+    at.session_state['draft_1042'] = 'Front Desk message in progress'
+    at.session_state['dispatch_draft'] = {'saved': '1046'}
+    next(b for b in at.button if b.label == '+ New order').click().run()
+    assert at.session_state['draft_1042'] == 'Front Desk message in progress'
+    assert not at.exception

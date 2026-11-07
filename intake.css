@@ -1,0 +1,107 @@
+/* Dispatch owns these keyed containers only. Native controls retain keyboard
+   semantics; HTML ticket markup is read-only. Spacing scale: 4/8/12/16/24/32. */
+.st-key-dispatch, .st-key-dispatch_dialog {
+  --dispatch-bg: #f7f6f2;
+  --dispatch-ink: #1d2227;
+  --dispatch-muted: #62686f;
+  --dispatch-rule: #e2e1db;
+  --dispatch-accent: #c7683c;
+  color: var(--dispatch-ink);
+  color-scheme: light;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.st-key-dispatch { background: var(--dispatch-bg); padding: 24px; border-radius: 2px; }
+.st-key-dispatch p, .st-key-dispatch label, .st-key-dispatch_dialog p, .st-key-dispatch_dialog label { color: var(--dispatch-ink); }
+.st-key-dispatch button, .st-key-dispatch_dialog button { border-radius: 4px; box-shadow: none; }
+.st-key-dispatch button:focus-visible, .st-key-dispatch_dialog button:focus-visible { outline: 2px solid #9f4c27; outline-offset: 3px; }
+.st-key-dispatch [data-testid="stBaseButton-primary"], .st-key-dispatch_dialog [data-testid="stBaseButton-primary"] {
+  background: #a94f28; border-color: #a94f28; color: white;
+}
+.st-key-dispatch [data-testid="stBaseButton-primary"] p, .st-key-dispatch_dialog [data-testid="stBaseButton-primary"] p { color: white; }
+.st-key-dispatch [data-testid="stBaseButton-secondary"], .st-key-dispatch_dialog [data-testid="stBaseButton-secondary"] {
+  background: white; border: 1px solid #d4d3cd; color: #1d2227;
+}
+.st-key-dispatch [data-testid="stTextInput"] input, .st-key-dispatch_dialog [data-testid="stTextInput"] input,
+.st-key-dispatch_dialog [data-testid="stNumberInput"] input { background: white; color: #1d2227; }
+.st-key-dispatch_dialog [data-baseweb="tag"],
+.st-key-dispatch_dialog [data-testid="stMultiSelect"] [data-tag] { background: #eee8dd; color: #1d2227; border-radius: 3px; }
+.st-key-dispatch_dialog [data-baseweb="tag"] span,
+.st-key-dispatch_dialog [data-testid="stMultiSelect"] [data-tag] span { color: #1d2227; }
+.st-key-dispatch_dialog [data-baseweb="select"]:focus-within > div,
+.st-key-dispatch_dialog [data-baseweb="input"]:focus-within,
+.st-key-dispatch [data-baseweb="input"]:focus-within,
+.st-key-dispatch_dialog [data-testid="stMultiSelect"] [data-focus-within="true"] { border-color: #c7683c; }
+.dispatch-identity { font-size: 11px; font-weight: 750; letter-spacing: 1.5px; }
+.dispatch-identity span { color: #777c83; font-weight: 450; }
+.st-key-dispatch h2.dispatch-title { font-size: 32px; line-height: 1.2; font-weight: 650; letter-spacing: -1px; padding: 8px 0; margin: 0; color: #1d2227; }
+.dispatch-live { color: var(--dispatch-muted); font-size: 11px; }
+.dispatch-live i { display: inline-block; width: 5px; height: 5px; background: #52735d; margin-right: 6px; border-radius: 50%; }
+.dispatch-live span { color: #777c83; }
+.st-key-dispatch_filters { padding: 12px 0 0; }
+.st-key-dispatch_filters [role="radio"] { background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; }
+.st-key-dispatch_filters [role="radio"][aria-checked="true"] { background: transparent; border-color: #c7683c; }
+.st-key-dispatch_filters [role="radio"][aria-checked="true"] p { color: #98451f; }
+.dispatch-strip { display: flex; flex-wrap: wrap; gap: 16px 24px; border-block: 1px solid var(--dispatch-rule); padding: 12px 0; margin: 0 0 8px; }
+.dispatch-strip>span { font-size: 12px; color: var(--dispatch-muted); display: inline-flex; gap: 12px; align-items: baseline; }
+.dispatch-strip b { font-size: 16px; font-variant-numeric: tabular-nums; color: var(--dispatch-ink); font-weight: 650; }
+.dispatch-section-heading { font-size: 12px; font-weight: 650; margin: 0 0 4px; }
+.dispatch-section-heading span { font-size: 11px; font-weight: 400; color: var(--dispatch-muted); margin-left: 12px; }
+.st-key-dispatch_queue { background: white; border-top: 1px solid var(--dispatch-rule); gap: 0; }
+.st-key-dispatch_queue [class*="st-key-ticket_"] { padding: 12px; border-bottom: 1px solid var(--dispatch-rule); }
+.st-key-dispatch_queue [class*="st-key-ticket_selected_"] { background: #f3ede4; box-shadow: inset 3px 0 #c7683c; }
+.st-key-dispatch_queue button { font-size: 11px; min-height: 32px; padding: 4px 8px; }
+.st-key-dispatch_queue button:disabled { background: transparent; border-color: transparent; opacity: 1; }
+.st-key-dispatch_queue button:disabled p { color: #93502d; font-size: 11px; }
+.dispatch-row-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.dispatch-row { padding-bottom: 4px; }
+.dispatch-row-top>b { font-size: 18px; letter-spacing: -.4px; font-variant-numeric: tabular-nums; }
+.dispatch-channel { font-size: 12px; color: var(--dispatch-muted); }
+.dispatch-channel>span { display: inline-block; font-size: 9px; font-weight: 750; letter-spacing: .4px; border: 1px solid #d7d7d1; padding: 1px 3px; color: #4b5156; }
+.dispatch-row-status { font-size: 11px; color: var(--dispatch-muted); margin-left: auto; }
+.dispatch-row-recipient { font-size: 13px; margin-top: 4px; font-weight: 550; overflow-wrap: anywhere; }
+.dispatch-row-summary { font-size: 12px; color: var(--dispatch-muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dispatch-row-bottom { display: flex; flex-wrap: wrap; gap: 4px; font-size: 11px; margin-top: 4px; color: var(--dispatch-muted); }
+.dispatch-row .soon, .dispatch-ticket .soon { color: #8b631d; }
+.dispatch-row .overdue, .dispatch-ticket .overdue { color: #a13e30; }
+.st-key-dispatch_detail { background: white; border: 1px solid var(--dispatch-rule); border-radius: 0; }
+.dispatch-ticket { padding: 24px; }
+.dispatch-eyebrow { color: var(--dispatch-muted); text-transform: uppercase; letter-spacing: 1px; font-size: 9px; font-weight: 650; }
+.dispatch-ticket-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; }
+.dispatch-ticket h3 { font-size: 28px; color: #1d2227; padding: 0; margin: 0; letter-spacing: -.8px; }
+.dispatch-state { font-size: 11px; color: #62686f; }
+.dispatch-state.ready { color: #466b50; }
+.dispatch-ticket .dispatch-channel { margin-top: 8px; }
+.dispatch-recipient { font-size: 15px; font-weight: 550; margin-top: 24px; overflow-wrap: anywhere; }
+.dispatch-deadline { font-size: 12px; margin-top: 8px; }
+.dispatch-times { display: flex; flex-wrap: wrap; gap: 16px 24px; padding: 16px 0; margin: 0; border-bottom: 1px dashed #d7d7d1; }
+.dispatch-times dt { font-size: 11px; color: var(--dispatch-muted); }
+.dispatch-times dd { font-size: 12px; margin: 4px 0 0; font-variant-numeric: tabular-nums; }
+.dispatch-items-label { margin-top: 24px; }
+.dispatch-line { padding: 12px 0; border-bottom: 1px solid #eeede8; }
+.dispatch-food { display: flex; gap: 12px; font-size: 13px; }
+.dispatch-qty { font-variant-numeric: tabular-nums; min-width: 24px; }
+.dispatch-note { margin: 8px 0 0 36px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dispatch-note b, .dispatch-note span { display: block; }
+.dispatch-note b { font-size: 11px; font-weight: 550; color: var(--dispatch-muted); }
+.dispatch-note.allergy { background: #f8f0de; padding: 8px; color: #72531e; }
+.dispatch-note.allergy b { color: #72531e; }
+.dispatch-ticket footer { font-size: 9px; color: #777c83; margin-top: 24px; }
+.dispatch-empty { padding: 32px 24px; color: var(--dispatch-muted); }
+.dispatch-empty h3 { font-size: 16px; color: #1d2227; }
+.dispatch-empty p { font-size: 12px; }
+.dispatch-saved { font-size: 12px; color: #466b50; padding: 8px 0; }
+.st-key-dispatch_dialog h4 { font-size: 14px; color: #1d2227; border-top: 1px solid #e2e1db; padding-top: 16px; }
+/* Narrow only this native dialog, never another feature's modal. */
+[data-testid="stDialog"] > div:has(.st-key-dispatch_dialog) {
+  width: 720px; max-width: calc(100% - 32px); border-radius: 6px;
+}
+@media (max-width: 1000px) {
+  .st-key-dispatch { padding: 16px; }
+  .dispatch-ticket { padding: 16px; }
+  .dispatch-row-status { margin-left: 0; }
+}
+@media (max-width: 760px) {
+  .st-key-dispatch { padding: 12px; }
+  .dispatch-strip { gap: 12px 16px; }
+  .dispatch-strip>span { gap: 8px; }
+}
