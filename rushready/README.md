@@ -1,4 +1,4 @@
-# RushReady v2 — NOVA Front House Hackathon
+# BREDDY (formerly RushReady) — NOVA Front House Hackathon
 
 A functional **demo** of unified restaurant order intake, deadline-based kitchen prioritization, a chef-to-server OpenRouter incident agent, and human-confirmed packing/handoff. No real DoorDash/Uber Eats connectivity, customer messaging, or trained preparation-time model is included.
 
@@ -54,6 +54,10 @@ API source documents:
 4. **Front Desk:** Show which orders are blocked or delayed, revised readiness estimates, and *suggested* messages for staff. Nothing is actually sent.
 5. **Cook and Packer:** Resolve the incident, mark each item ready, tick packer checkboxes, manually confirm any modifiers and allergies, then seal the order.
 6. **Front Desk:** Mark the packed order handed off.
+
+## Kitchen Display (Smart Food Prioritizer)
+
+`kitchen-display/` is a standalone browser prototype. It ranks tickets by latest safe start time and handles modifier and allergy confirmation by tap or push-to-talk voice, with an audit log. No dependencies. Run `cd kitchen-display && npm test`, then `python3 -m http.server 8080`. See `kitchen-display/README.md`.
 
 ## Architecture
 

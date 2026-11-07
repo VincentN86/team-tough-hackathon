@@ -1,0 +1,120 @@
+<!doctype html>
+<html><head><meta charset="utf-8" /></head>
+<body style="margin:0">
+<!-- BREDDY draggable split-pane divider (main UI, NOT a feature). Zero-height Streamlit component.
+     HOW IT WORKS: Streamlit serves component iframes from the app's own origin, so this script can reach the parent page. It finds the two
+     panes (Streamlit's stable `st-key-<name>` classes), puts a real divider on top of the gap between their columns, and changes the
+     columns' widths while you drag (pointer events = mouse, touch and pen). Nothing is sent to Python, so there are NO reruns while dragging.
+     The ratio is remembered in localStorage and re-applied after reruns. If the parent page can't be reached, panes simply keep the 60/40 default.
+     Edit here to change: limits (MIN_LEFT/MIN_RIGHT), divider look (STYLE), keyboard step, default ratio (passed from ui/splitpane.py). -->
+<script>
+(function () {
+  function send(type, data) { window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type: type }, data), '*'); }
+  send('streamlit:componentReady', { apiVersion: 1 });
+  send('streamlit:setFrameHeight', { height: 0 });
+
+  var P, W;
+  try { P = window.parent.document; W = window.parent; P.body; } catch (e) { return; }   // parent not reachable: keep the default layout
+  var cfg = null, started = false;
+  window.addEventListener('message', function (e) {
+    if (e.data && e.data.type === 'streamlit:render' && !started) { cfg = e.data.args || {}; started = true; start(); }
+  });
+
+  var STYLE =
+    '.breddy-divider{position:fixed;z-index:60;width:24px;margin-left:-12px;cursor:col-resize;touch-action:none;display:flex;justify-content:center;outline:none;}' +
+    '.breddy-divider .bar{width:4px;height:100%;border-radius:2px;background:#d4d4d4;transition:background .12s,width .12s;}' +
+    '.breddy-divider:hover .bar,.breddy-divider.drag .bar{background:#ff3008;width:6px;}' +
+    '.breddy-divider:focus-visible .bar{background:#ff3008;box-shadow:0 0 0 3px #191919;}' +
+    '.breddy-divider .grip{position:absolute;top:50%;width:14px;height:44px;margin-top:-22px;border-radius:7px;background:#fff;border:1px solid #191919;' +
+    'display:flex;align-items:center;justify-content:center;gap:2px;}' +
+    '.breddy-divider .grip i{display:block;width:2px;height:16px;background:#191919;border-radius:1px;}';
+
+  function start() {
+    var KEY = 'breddy_split_ratio', DEF = cfg.default || 0.6, MIN_LEFT = cfg.minLeft || 340, MIN_RIGHT = cfg.minRight || 300, STEP = 0.02, NARROW = 900;
+    var ratio = DEF;
+    try { var saved = parseFloat(W.localStorage.getItem(KEY)); if (saved > 0.2 && saved < 0.8) ratio = saved; } catch (x) {}
+    var dragging = false, div = null;
+
+    if (!P.getElementById('breddy-split-style')) {
+      var st = P.createElement('style'); st.id = 'breddy-split-style'; st.textContent = STYLE; P.head.appendChild(st);
+    }
+    P.querySelectorAll('.breddy-divider').forEach(function (n) { n.remove(); });   // never keep a stale divider from an earlier run
+
+    function parts() {
+      var l = P.querySelector('.st-key-' + cfg.left), r = P.querySelector('.st-key-' + cfg.right);
+      if (!l || !r) return null;
+      var lc = l.closest('[data-testid="stColumn"]'), rc = r.closest('[data-testid="stColumn"]');
+      var row = lc && lc.parentElement;
+      return (lc && rc && row && rc.parentElement === row) ? { lc: lc, rc: rc, row: row } : null;
+    }
+    function clamp(r, rowW) {
+      var lo = Math.max(0.2, MIN_LEFT / rowW), hi = Math.min(0.8, 1 - MIN_RIGHT / rowW);
+      return hi < lo ? DEF : Math.min(hi, Math.max(lo, r));
+    }
+    function clear(p) {
+      ['lc', 'rc'].forEach(function (k) { ['flex', 'width', 'min-width'].forEach(function (pr) { p[k].style.removeProperty(pr); }); });
+    }
+    function layout() {
+      var p = parts();
+      if (!p) { if (div) { div.remove(); div = null; } return; }
+      var rect = p.row.getBoundingClientRect();
+      if (W.innerWidth < NARROW) { clear(p); if (div) div.style.display = 'none'; return; }     // small screens: panes stack, no divider
+      if (!div) { div = build(); P.body.appendChild(div); }
+      var gap = parseFloat(W.getComputedStyle(p.row).columnGap) || 16;
+      var r = clamp(ratio, rect.width);
+      p.lc.style.setProperty('flex', '0 0 calc(' + (r * 100) + '% - ' + (gap / 2) + 'px)', 'important');
+      p.lc.style.setProperty('width', 'calc(' + (r * 100) + '% - ' + (gap / 2) + 'px)', 'important');
+      p.rc.style.setProperty('flex', '0 0 calc(' + ((1 - r) * 100) + '% - ' + (gap / 2) + 'px)', 'important');
+      p.rc.style.setProperty('width', 'calc(' + ((1 - r) * 100) + '% - ' + (gap / 2) + 'px)', 'important');
+      p.lc.style.setProperty('min-width', '0', 'important'); p.rc.style.setProperty('min-width', '0', 'important');
+      div.style.display = 'flex';
+      div.style.top = rect.top + 'px'; div.style.height = rect.height + 'px';
+      div.style.left = (rect.left + r * rect.width) + 'px';
+      div.setAttribute('aria-valuenow', Math.round(r * 100));
+    }
+    function setRatio(r) {
+      var p = parts(); if (!p) return;
+      ratio = clamp(r, p.row.getBoundingClientRect().width); layout();
+    }
+    function save() { try { W.localStorage.setItem(KEY, String(ratio)); } catch (x) {} }
+
+    function build() {
+      var d = P.createElement('div');
+      d.className = 'breddy-divider'; d.tabIndex = 0;
+      d.setAttribute('role', 'separator'); d.setAttribute('aria-orientation', 'vertical');
+      d.setAttribute('aria-label', 'Resize panels. Use left and right arrow keys.');
+      d.setAttribute('aria-valuemin', '20'); d.setAttribute('aria-valuemax', '80');
+      d.innerHTML = '<div class="bar"></div><div class="grip"><i></i><i></i></div>';
+      d.addEventListener('pointerdown', function (e) {
+        dragging = true; d.classList.add('drag'); d.setPointerCapture(e.pointerId); e.preventDefault();
+        P.body.style.userSelect = 'none';
+      });
+      d.addEventListener('pointermove', function (e) {
+        if (!dragging) return;
+        var p = parts(); if (!p) return;
+        var rect = p.row.getBoundingClientRect();
+        setRatio((e.clientX - rect.left) / rect.width);
+      });
+      function end(e) {
+        if (!dragging) return; dragging = false; d.classList.remove('drag'); P.body.style.userSelect = '';
+        try { d.releasePointerCapture(e.pointerId); } catch (x) {} save();
+      }
+      d.addEventListener('pointerup', end); d.addEventListener('pointercancel', end);
+      d.addEventListener('keydown', function (e) {            // keyboard: arrows resize, Home/End to the limits, Enter resets
+        var k = e.key, used = true;
+        if (k === 'ArrowLeft') setRatio(ratio - STEP); else if (k === 'ArrowRight') setRatio(ratio + STEP);
+        else if (k === 'Home') setRatio(0); else if (k === 'End') setRatio(1); else if (k === 'Enter') setRatio(DEF); else used = false;
+        if (used) { e.preventDefault(); save(); }
+      });
+      d.addEventListener('dblclick', function () { setRatio(DEF); save(); });
+      return d;
+    }
+
+    layout();
+    var timer = setInterval(layout, 300);                         // re-applies after Streamlit reruns / window or sidebar resizes
+    W.addEventListener('resize', layout);
+    window.addEventListener('pagehide', function () { clearInterval(timer); if (div) div.remove(); });
+  }
+})();
+</script>
+</body></html>

@@ -2,7 +2,6 @@
 Run with: python3 -m streamlit run app.py
 """
 from datetime import datetime, timezone
-import html
 import os
 
 import streamlit as st
@@ -11,83 +10,15 @@ from database import (MENU,SOURCES,RECIPIENTS,STATIONS,init_db,reset_demo,create
                       verify_special,seal_order,handoff_order,add_incident,resolve_incident)
 from scheduler import schedule,batch_hints
 from ai_agent import parse_issue,transcribe_wav,inspect_packing_photo
+from roles import ensure_role_selected,run_app          # role-based navigation (integration layer)
+from features.communication import reset_feature_data   # Feature 3 (Liz): clears its tables on demo reset
 
-st.set_page_config(page_title='RushReady • NOVA 2026',page_icon='🍔',layout='wide',initial_sidebar_state='expanded')
+st.set_page_config(page_title='BREDDY',layout='wide',initial_sidebar_state='collapsed')
 init_db()
 
 st.markdown('''<style>
-.block-container {max-width: none; padding-top: .6rem; padding-left: 2rem; padding-right: 2rem;}
-/* Hide Streamlit's own top bar so the tickets sit at the very top */
-header[data-testid="stHeader"]{display:none;}
-/* Slim app header */
-.rr-logo{font-size:1.25rem;font-weight:800;white-space:nowrap;}
-.rr-logo small{font-size:.75rem;font-weight:500;color:#8a93a3;margin-left:.5rem;}
-.rr-user{font-size:.85rem;color:#8a93a3;text-align:right;white-space:nowrap;}
+.block-container {max-width: 1360px; padding-top: 1.6rem;}
 [data-testid="stMetric"]{border:1px solid #dae1e5; border-radius:12px; padding:12px;}
-
-/* ---- Ticket rail: Streamlit's sidebar, pinned to the very left edge ---- */
-section[data-testid="stSidebar"]{width:280px!important;min-width:280px!important;max-width:280px!important;background:#111214;}
-[data-testid="stSidebarHeader"],[data-testid="stSidebarCollapseButton"]{display:none;}
-[data-testid="stSidebarContent"]{padding:0!important;}
-[data-testid="stSidebarUserContent"]{padding:12px 12px 48px 0!important;}
-.rail-title{font-weight:800;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:#8a93a3;margin:0 0 2px 12px;}
-@media (max-width: 768px){header[data-testid="stHeader"]{display:block;}}
-
-/* Paper ticket (shared by rail tabs) */
-.ticket{background:#fffdf4;color:#1d1d1d;width:100%;
-  font-family:"Courier New",Courier,monospace;font-size:14px;line-height:1.35;padding:14px 14px 22px;position:relative;
-  border-left:0 solid #ffd23f;transition:transform .15s ease,border-left-width .15s ease;
-  /* torn zig-zag bottom edge */
-  -webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/14px 100%;
-          mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/14px 100%;}
-.ticket::before{content:"";position:absolute;left:0;right:0;top:0;height:6px;background:var(--src,#555);}
-.ticket .t-top{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-top:4px;}
-.ticket .t-no{font-size:24px;font-weight:700;letter-spacing:1px;}
-.ticket .t-src{font-size:10.5px;font-weight:700;text-transform:uppercase;color:#fff;background:var(--src,#555);padding:2px 6px;border-radius:3px;white-space:nowrap;}
-.ticket .t-meta{font-size:12px;color:#555;margin-top:2px;}
-.ticket .t-cut{border-top:2px dashed #b9b2a0;margin:9px -14px;}
-.ticket .t-item{font-weight:700;font-size:15px;}
-.ticket .t-mod{padding-left:18px;font-size:13px;}
-.ticket .t-mod::before{content:"» ";}
-.ticket .t-allergy{margin-top:8px;border:2px solid #c0157a;background:#ffe3f2;color:#8a0050;font-weight:700;font-size:12.5px;padding:5px 7px;}
-.ticket .t-status{display:inline-block;margin-top:2px;font-size:11px;font-weight:700;text-transform:uppercase;border:1.5px solid #1d1d1d;padding:1px 5px;}
-.ticket .t-due{font-size:13px;font-weight:700;text-align:right;white-space:nowrap;}
-.ticket .t-summary{font-size:13px;font-weight:700;}
-.ticket .t-flag{display:inline-block;margin-top:6px;font-size:11.5px;font-weight:700;color:#8a0050;background:#ffe3f2;border:2px solid #c0157a;padding:1px 6px;}
-.ticket.open{border-left-width:9px;}
-.ticket .t-open{font-size:11px;font-weight:700;background:#ffd23f;color:#1d1d1d;padding:1px 6px;}
-
-/* Each rail tab is a container with an invisible full-size button on top, so the whole ticket is clickable */
-.stVerticalBlock[class*="st-key-tab_"]{position:relative;gap:0;}
-[class*="st-key-open_"]{position:absolute!important;inset:0;width:100%!important;height:100%!important;z-index:3;margin:0;}
-.stVerticalBlock[class*="st-key-tab_"] [data-testid="stMarkdownContainer"]{margin-bottom:0;}
-[class*="st-key-open_"] .stButton,[class*="st-key-open_"] .stButton>div,[class*="st-key-open_"] button{width:100%;height:100%;}
-[class*="st-key-open_"] button{opacity:0;cursor:pointer;}
-.stVerticalBlock[class*="st-key-tab_"]:hover .ticket{transform:translateX(5px);}
-.stVerticalBlock[class*="st-key-tab_"]:has(button:focus-visible) .ticket{border-left:9px solid #fff;}
-
-/* ---- Opened ticket: big paper ticket filling the main area ---- */
-.st-key-big_ticket{background:#fffdf4;color:#1d1d1d;font-family:"Courier New",Courier,monospace;
-  padding:26px 34px 52px;min-height:68vh;border-top:14px solid var(--bt-src,#555);
-  -webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/22px 100%;
-          mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/22px 100%;}
-.st-key-big_ticket [data-testid="stMarkdownContainer"]{color:#1d1d1d;font-family:inherit;}
-.st-key-big_ticket button{background:#fff;color:#1d1d1d;border:2px solid #1d1d1d;font-family:inherit;font-weight:700;min-height:3.2rem;}
-.st-key-big_ticket button:hover{background:#1d1d1d;color:#fffdf4;border-color:#1d1d1d;}
-.st-key-big_ticket button:disabled{background:transparent;color:#9a958a;border-color:#cfc9ba;}
-.bt-no{font-size:56px;font-weight:700;letter-spacing:2px;line-height:1;}
-.bt-src{display:inline-block;font-size:16px;font-weight:700;text-transform:uppercase;color:#fff;background:var(--bt-src,#555);padding:4px 10px;border-radius:4px;vertical-align:middle;margin-left:14px;}
-.bt-meta{font-size:17px;color:#555;margin-top:10px;}
-.bt-meta b{color:#1d1d1d;}
-.bt-cut{border-top:3px dashed #b9b2a0;margin:18px -34px 14px;}
-.bt-item{font-size:28px;font-weight:700;line-height:1.2;}
-.bt-sub{font-size:15px;color:#555;margin-top:2px;}
-.bt-mod{font-size:21px;padding-left:28px;margin-top:4px;}
-.bt-mod::before{content:"» ";}
-.bt-chip{display:inline-block;font-size:13px;font-weight:700;text-transform:uppercase;border:2px solid #1d1d1d;padding:1px 7px;margin-left:10px;vertical-align:middle;}
-.bt-chip.cooking{background:#ffd23f;}
-.bt-chip.ready{background:#2fbf71;border-color:#1a7a46;}
-.bt-allergy{margin-top:6px;border:3px solid #c0157a;background:#ffe3f2;color:#8a0050;font-weight:700;font-size:19px;padding:6px 10px;}
 </style>''',unsafe_allow_html=True)
 
 try:
@@ -97,26 +28,9 @@ except (FileNotFoundError,KeyError):
     configured=''
     default_model='openrouter/auto'
 
-# ---- Slim header: logo · signed-in user · Log in/out · Settings ----
-STAFF=['Maria (Cook)','Dev (Cook)','Sam (Packer)','Jordan (Manager)']
-logo_col,user_col,login_col,settings_col=st.columns([6,2.2,1.2,1.2],vertical_alignment='center')
-logo_col.markdown("<div class='rr-logo'>🍔 RushReady<small>Demo · fictional orders</small></div>",unsafe_allow_html=True)
-user=st.session_state.get('staff_user')
-user_col.markdown(f"<div class='rr-user'>{'Signed in: <b>'+html.escape(user)+'</b>' if user else 'Not signed in'}</div>",unsafe_allow_html=True)
-with login_col:
-    if user:
-        if st.button('Log out',use_container_width=True):
-            st.session_state.pop('staff_user',None)
-            st.rerun()
-    else:
-        with st.popover('Log in',use_container_width=True):
-            # Demo sign-in only: picks a name for the session, no password or real authentication.
-            who=st.selectbox('Who is working?',STAFF)
-            if st.button('Sign in',type='primary',use_container_width=True):
-                st.session_state['staff_user']=who
-                st.rerun()
-with settings_col.popover('⚙️',use_container_width=True,help='Settings'):
-    st.caption('DEMO ONLY — no live DoorDash/Uber Eats integrations or customer notifications.')
+with st.sidebar:
+    st.title('BREDDY')
+    st.caption('NOVA hackathon • Fictional order data')
     KEY=os.environ.get('OPENROUTER_API_KEY','') or configured
     if KEY:
         st.success('OpenRouter key configured')
@@ -126,13 +40,18 @@ with settings_col.popover('⚙️',use_container_width=True,help='Settings'):
     STT_MODEL=st.text_input('Speech-to-text model', value='openai/whisper-1')
     VISION_MODEL=st.text_input('Vision model',value=default_model)
     st.caption('Model access depends on sponsor credits; AI calls cost credits. Never commit your API key.')
+    st.divider()
     if st.button('Reset demo restaurant',use_container_width=True):
         reset_demo()
+        reset_feature_data()
         for k in ['issue_preview','chef_report_text','photo_result']:
             st.session_state.pop(k,None)
         st.rerun()
     if st.button('Refresh', use_container_width=True):
         st.rerun()
+
+ensure_role_selected()  # landing screen: pick Kitchen or Front Desk (stops here until chosen)
+# (page title + demo caption removed: the compact top bar in roles.py replaces them. DEMO ONLY - no live DoorDash/Uber Eats or customer messages.)
 
 
 def clock(t):
@@ -141,10 +60,10 @@ def clock(t):
 
 def urgency_chip(row):
     val=row['urgency']
-    if val=='BLOCKED': st.error('🛑 Ingredient unavailable')
-    elif val=='LATE': st.error(f"⚠️ Predicted {row['late_minutes']} min late")
-    elif val=='RISK': st.warning(f"⚠️ At risk • {row['slack']} min slack")
-    else: st.success(f"✓ On track • {row['slack']} min slack")
+    if val=='BLOCKED': st.error('Ingredient unavailable')
+    elif val=='LATE': st.error(f"Predicted {row['late_minutes']} min late")
+    elif val=='RISK': st.warning(f"At risk • {row['slack']} min slack")
+    else: st.success(f"On track • {row['slack']} min slack")
 
 
 def order_header(o):
@@ -154,34 +73,6 @@ def order_header(o):
 
 def item_text(item):
     return f"{item['quantity']}× {item['name']}"
-
-
-TICKET_COLORS={'DoorDash':'#e8320b','Uber Eats':'#05a357','Website':'#7c4ddb','Phone':'#2563eb','In-person POS':'#444'}
-
-
-def ticket_html(o,compact=False,selected=False):
-    """One order as a paper kitchen ticket. compact=True is the small rail tab; selected marks the open ticket."""
-    e=html.escape
-    lines=[]
-    for i in o['items']:
-        lines.append(f"<div class='t-item'>{e(str(i['quantity']))} × {e(i['name'])}</div>")
-        if i['modifier']:
-            lines.append(f"<div class='t-mod'>{e(i['modifier'])}</div>")
-    allergies=[f"{e(i['name'])}: {e(i['allergy'])}" for i in o['items'] if i['allergy']]
-    allergy_box=f"<div class='t-allergy'>⚠ ALLERGY<br>{'<br>'.join(allergies)}</div>" if allergies else ''
-    color=TICKET_COLORS.get(o['source'],'#555')
-    head=(f"<div class='t-top'><span class='t-no'>#{e(str(o['id']))}</span><span class='t-src'>{e(o['source'])}</span></div>"
-          f"<div class='t-top'><span class='t-status'>{e(o['status'].replace('_',' '))}</span>"
-          f"<span class='t-due'>DUE {e(clock(o['pickup_at']))}</span></div>")
-    if compact:
-        count=sum(i['quantity'] for i in o['items'])
-        flag="<div class='t-flag'>⚠ ALLERGY</div>" if allergies else ''
-        return (f"<div class='ticket tab' style='--src:{color}'>{head}<div class='t-cut'></div>"
-                f"<div class='t-summary'>{count} item{'s' if count!=1 else ''} · {e(o['recipient'])}</div>{flag}</div>")
-    opened="<div class='t-top'><span class='t-open'>OPEN ▸</span></div>" if selected else ''
-    return (f"<div class='ticket{' open' if selected else ''}' style='--src:{color}'>{opened}{head}"
-            f"<div class='t-meta'>{e(o['recipient'])} · In {e(clock(o['received_at']))}</div>"
-            f"<div class='t-cut'></div>{''.join(lines)}{allergy_box}</div>")
 
 
 def incident_summary(o):
@@ -198,68 +89,10 @@ def incident_summary(o):
     return '; '.join(result)
 
 
-# ---- Ticket rail: every order as a ticket tab down the very left of the screen. Newest at the top. ----
-with st.sidebar:
-    @st.fragment(run_every='5s')
-    def ticket_tabs():
-        orders=sorted(fetch_orders(),key=lambda x:x['received_at'],reverse=True)
-        st.markdown(f"<div class='rail-title'>Tickets · {len(orders)}</div>",unsafe_allow_html=True)
-        if not orders:
-            st.caption('No orders yet.')
-            return
-        open_id=st.session_state.get('open_ticket')
-        for o in orders:
-            is_open=str(o['id'])==str(open_id)
-            with st.container(key=f"tab_{o['id']}"):
-                st.markdown(ticket_html(o,compact=not is_open,selected=is_open),unsafe_allow_html=True)
-                # Invisible button stretched over the ticket (see CSS) so the whole tab is clickable.
-                if st.button(f"{'Close' if is_open else 'Open'} ticket #{o['id']}",key=f"open_{o['id']}"):
-                    st.session_state['open_ticket']=None if is_open else o['id']
-                    st.rerun()
-    ticket_tabs()
+# Each former tab is now a plain function (bodies unchanged). roles.py decides which role shows which screens.
 
-
-# ---- Opened ticket: fills the main area so the chef can work from it ----
-def opened_ticket():
-    open_id=st.session_state.get('open_ticket')
-    if not open_id:
-        return
-    o=next((x for x in fetch_orders() if str(x['id'])==str(open_id)),None)
-    if o is None:
-        st.session_state.pop('open_ticket',None)
-        return
-    e=html.escape
-    color=TICKET_COLORS.get(o['source'],'#555')
-    st.markdown(f"<style>.st-key-big_ticket{{--bt-src:{color};}}</style>",unsafe_allow_html=True)
-    with st.container(key='big_ticket'):
-        top,close=st.columns([6,1],vertical_alignment='top')
-        top.markdown(f"<div><span class='bt-no'>#{e(str(o['id']))}</span><span class='bt-src'>{e(o['source'])}</span>"
-                     f"<span class='bt-chip'>{e(o['status'].replace('_',' '))}</span></div>"
-                     f"<div class='bt-meta'>{e(o['recipient'])} · In <b>{e(clock(o['received_at']))}</b> · "
-                     f"DUE <b>{e(clock(o['pickup_at']))}</b></div>",unsafe_allow_html=True)
-        if close.button('✕ Close',key='close_ticket',use_container_width=True):
-            st.session_state.pop('open_ticket',None)
-            st.rerun()
-        st.markdown("<div class='bt-cut'></div>",unsafe_allow_html=True)
-        for it in o['items']:
-            text,start,ready=st.columns([5,1.3,1.3],vertical_alignment='center')
-            text.markdown(f"<div class='bt-item'>{e(str(it['quantity']))} × {e(it['name'])}"
-                          f"<span class='bt-chip {e(it['status'])}'>{e(it['status'])}</span></div>"
-                          f"<div class='bt-sub'>{e(it['station'])} · {e(str(it['prep_minutes']))} min</div>"
-                          +(f"<div class='bt-mod'>{e(it['modifier'])}</div>" if it['modifier'] else '')
-                          +(f"<div class='bt-allergy'>⚠ ALLERGY: {e(it['allergy'])}</div>" if it['allergy'] else ''),
-                          unsafe_allow_html=True)
-            if start.button('Start',key=f"bt_start_{it['id']}",disabled=it['status']!='queued',use_container_width=True):
-                update_item(it['id'],'cooking');st.rerun()
-            if ready.button('✓ Ready',key=f"bt_ready_{it['id']}",disabled=it['status']=='ready',use_container_width=True):
-                update_item(it['id'],'ready');st.rerun()
-    st.write('')
-opened_ticket()
-
-tabs=st.tabs(['📥 Order Intake','👨‍🍳 Cook & AI Agent','📦 Packer','🛎️ Front Desk','📊 Workflow'])
-
-with tabs[0]:
-    left,_=st.columns([1,1.6],gap='large')
+def screen_intake():  # was: with tabs[0]  (Feature 1: order intake)
+    left,right=st.columns([1,1.6],gap='large')
     with left:
         st.subheader('Simulate a new order')
         st.caption('Choose a platform to simulate a unified feed. No platform API is connected.')
@@ -280,11 +113,27 @@ with tabs[0]:
                 new_id=create_order(source,recipient,minutes,lines)
                 st.success(f'Order #{new_id} added to the shared database.')
                 st.rerun()
+    with right:
+        st.subheader('All platforms → one feed')
+        @st.fragment(run_every='5s')
+        def intake_feed():
+            orders=fetch_orders()
+            for o in sorted(orders,key=lambda x:x['received_at'],reverse=True):
+                with st.container(border=True):
+                    order_header(o)
+                    st.write(' · '.join(item_text(i) for i in o['items']))
+                    if any(i['modifier'] for i in o['items']):
+                        st.info('Modifiers: '+'; '.join(f"{i['name']}: {i['modifier']}" for i in o['items'] if i['modifier']))
+                    if any(i['allergy'] for i in o['items']):
+                        st.warning('ALLERGY INSTRUCTIONS: Staff must verify')
+        intake_feed()
 
-with tabs[1]:
-    st.subheader('Kitchen tickets — ranked by deadline risk')
-    st.caption('Priority uses estimated latest-start times, not simple arrival order. Each station processes one ticket line at a time in this demo.')
-    station_filter=st.selectbox('Cooking station', ['All stations']+STATIONS)
+def screen_cook():  # was: with tabs[1]  (Feature 2: kitchen queue/prioritization)
+    st.subheader('Kitchen Tickets')
+    pick,help_col=st.columns([5,1],vertical_alignment='bottom')
+    station_filter=pick.selectbox('Cooking station', ['All stations']+STATIONS)
+    with help_col.popover('Help'):  # was a caption above the tickets (UI-only move; no logic change)
+        st.caption('Priority uses estimated latest-start times, not simple arrival order. Each station processes one ticket line at a time in this demo.')
     @st.fragment(run_every='5s')
     def cook_queue():
         ranked=schedule(fetch_orders(),fetch_incidents())
@@ -294,7 +143,7 @@ with tabs[1]:
         stt[2].metric('Blocked',sum(x['blocked'] for x in ranked))
         for station,name,count in batch_hints(fetch_orders()):
             if station_filter=='All stations' or station_filter==station:
-                st.info(f'💡 Batching hint: **{count}× {name}** needed at {station}')
+                st.info(f'Batching hint: **{count}× {name}** needed at {station}')
         for priority,o in enumerate(ranked,start=1):
             visible=[i for i in o['items'] if station_filter=='All stations' or i['station']==station_filter]
             if not visible: continue
@@ -323,7 +172,9 @@ with tabs[1]:
                         if st.button('✓ Ready',key=f"ready_{it['id']}",disabled=it['status']=='ready',use_container_width=True):
                             update_item(it['id'],'ready');st.rerun()
     cook_queue()
-    st.divider()
+
+
+def screen_legacy_agent():  # Vincent's original typed chef report (moved out of screen_cook; code unchanged)
     st.subheader('🤖 Chef → Server communication agent')
     st.write('Report an unavailable ingredient or a kitchen station delay. Review AI interpretation before applying it.')
     if 'chef_report_text' not in st.session_state:
@@ -375,7 +226,7 @@ with tabs[1]:
                 resolve_incident(i['id']);st.rerun()
     active_incidents()
 
-with tabs[2]:
+def screen_packer():  # was: with tabs[2]  (Feature 4: packing verification)
     st.subheader('Packing verification')
     st.caption('A human packer checks each item. Photos do not verify sealed containers, hidden modifiers, or allergens.')
     @st.fragment(run_every='5s')
@@ -430,7 +281,7 @@ with tabs[2]:
             st.info(st.session_state.photo_result)
             st.caption('Photo analysis is only a suggestion. Employee sign-off is always required.')
 
-with tabs[3]:
+def screen_front_desk():  # was: with tabs[3]  (pickup / handoff)
     st.subheader('Server / front desk — pickup coordination')
     @st.fragment(run_every='5s')
     def front_desk():
@@ -464,7 +315,7 @@ with tabs[3]:
         st.caption('No SMS, push notification, DoorDash, or Uber Eats message is actually sent. This screen prepares staff-facing drafts.')
     front_desk()
 
-with tabs[4]:
+def screen_notes():  # was: with tabs[4]
     st.subheader('System implementation notes')
     st.markdown('''
     **Order lifecycle:** Incoming → Cooking → Ready to pack → Staff verified/packed → Handed off.
@@ -482,3 +333,8 @@ with tabs[4]:
     on one running instance but does not guarantee persistence on hosted servers.
     ''')
     st.code('python3 -m pip install -r requirements.txt\npython3 -m streamlit run app.py',language='bash')
+
+
+# ---- ROLE-BASED APP: Kitchen vs Front Desk (see roles.py). Feature 3 is plugged in there. ----
+run_app({'cook':screen_cook,'legacy_agent':screen_legacy_agent,'intake':screen_intake,'packer':screen_packer,
+         'front_desk':screen_front_desk,'notes':screen_notes},KEY,MODEL)
