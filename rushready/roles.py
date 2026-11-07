@@ -1,38 +1,38 @@
-"""INTEGRATION LAYER — role-based navigation for RushReady.  Owner: shared (Liz + Vincent).
+"""MAIN-APP SHELL — role state, compact top bar, secondary navigation and workspace composition.  Owner: main BREDDY UI.
 
-app.py keeps all of Vincent's screens as plain functions (intake, cook queue, packer, front desk ...). This file only
-decides WHICH screens each role sees and draws the welcome page + role switcher. It holds no business logic and no data:
-both roles read/write the SAME SQLite database through the same functions, so switching roles never resets anything.
+app.py keeps the team's screens as plain functions (intake, cook queue, packer, front desk ...). This file decides WHICH screens each
+role sees and how they are arranged. It holds no business logic and no data: both roles read/write the SAME SQLite database, so
+switching roles never resets anything.   NOTE: the role lives in st.session_state (per browser tab) — a demo switch, NOT authentication.
 
-Feature 3 is plugged in at exactly two places (search for 'FEATURE 3'):
-    Kitchen view -> features.communication.render_voice_panel
-    Server view  -> features.communication.render_server_alerts
+Composition (search for 'FEATURE' to find where feature code is plugged in):
+    Kitchen    ONE screen. left pane: Feature 2 queue (screens['cook']) + collapsed 'Incoming orders'
+               right pane: Feature 3 voice panel (render_voice_panel) + collapsed original typed report.
+               A draggable divider (ui/splitpane.py) sits between the panes (default 60/40).
+    Front Desk left pane: order rows + packing view (frontdesk.py)  right pane: Feature 3 alert cards (render_server_alerts)
 
-NOTE: the role is stored in st.session_state, i.e. per browser tab. It is a demo workspace switch, NOT authentication.
+WHERE TO EDIT
+    Top bar (brand, role chip, nav, status chips, switch) ... render_topbar()
+    Front Desk navigation items ............................. SERVER_NAV
+    Kitchen layout / default split / limits ................. render_kitchen()  (limits: ui/splitpane.py)
+    Colours / fonts / spacing / pane scrolling .............. ui/theme.py
+    Landing screen .......................................... landing.py
 """
 import streamlit as st
 
-from features.communication import render_server_alerts, render_voice_panel  # FEATURE 3
+from database import fetch_incidents, fetch_orders
+from features.communication import render_voice_panel  # FEATURE 3
+from frontdesk import render_orders_workspace           # Front Desk layout (main UI)
+from landing import BRAND, render_role_picker
+from scheduler import schedule                           # core: only to show late/blocked counts in the top bar
+from ui.splitpane import render_splitter
+from ui.theme import inject_theme
 
 ROLE_KEY = 'rr_role'
 ROLES = {
-    'kitchen': {'icon': '👨‍🍳', 'title': 'CHEF / KITCHEN', 'button': 'Enter Kitchen', 'label': 'Kitchen',
-                'points': ['Kitchen orders & prep queue', 'Food prioritization by deadline', 'AI voice communication', 'Preparation status']},
-    'server': {'icon': '🛎️', 'title': 'PACKER / SERVER', 'button': 'Enter Front Desk', 'label': 'Front Desk',
-               'points': ['Kitchen updates & alerts', 'Orders ready for packing', 'Packing verification', 'Pickup coordination']},
+    'kitchen': {'title': 'CHEF / KITCHEN', 'button': 'Enter Kitchen', 'label': 'Kitchen'},
+    'server': {'title': 'PACKER / SERVER', 'button': 'Enter Front Desk', 'label': 'Front Desk'},
 }
-
-# ====================================================================
-# UI SECTION: SHARED STYLING for the welcome page and header
-# ====================================================================
-CSS = '''<style>
-.rr-welcome h1{text-align:center;font-size:2.6rem;margin-bottom:0}
-.rr-welcome p.sub{text-align:center;font-size:1.25rem;color:#667085;margin-top:4px}
-.rr-card-icon{font-size:4rem;text-align:center;line-height:1.1}
-.rr-card-title{text-align:center;font-size:1.5rem;font-weight:800;margin:6px 0 10px}
-.rr-card ul{margin:0 0 12px 0;padding-left:1.2rem;font-size:1.05rem}
-.stButton>button{min-height:3rem}
-</style>'''
+SERVER_NAV = {'orders': 'Orders', 'new': 'New order', 'classic': 'Classic', 'notes': 'Notes'}   # Kitchen has no secondary navigation
 
 
 def current_role():
@@ -43,81 +43,80 @@ def _pick(role):
     st.session_state[ROLE_KEY] = role
 
 
-# ====================================================================
-# UI SECTION: ROLE SELECTION SCREEN
-# Edit here to change the opening page, role cards, labels and layout.
-# ====================================================================
 def ensure_role_selected():
-    """Call once near the top of app.py. Shows the welcome page and stops the script until a role is chosen."""
+    """Call once near the top of app.py. Shows the landing screen and stops the script until a role is chosen."""
     if current_role() in ROLES:
         return
-    st.markdown(CSS, unsafe_allow_html=True)
-    st.markdown('<div class="rr-welcome"><h1>🍔 Welcome to RushReady</h1><p class="sub">How are you working today?</p></div>', unsafe_allow_html=True)
-    st.write('')
-    _, col_a, col_b, _ = st.columns([0.5, 2, 2, 0.5], gap='large')
-    for col, role in ((col_a, 'kitchen'), (col_b, 'server')):
-        r = ROLES[role]
-        with col.container(border=True):
-            st.markdown(f'<div class="rr-card"><div class="rr-card-icon">{r["icon"]}</div><div class="rr-card-title">{r["title"]}</div>'
-                        f'<ul>{"".join(f"<li>{p}</li>" for p in r["points"])}</ul></div>', unsafe_allow_html=True)
-            st.button(r['button'], key=f'enter_{role}', type='primary', use_container_width=True, on_click=_pick, args=(role,))
-    st.caption('No login needed for this demo. You can switch between Kitchen and Front Desk at any time; nothing is reset.')
+    render_role_picker(ROLES, _pick)
     st.stop()
 
 
 # ====================================================================
-# UI SECTION: ROLE SWITCHER (header)
+# UI SECTION: TOP BAR — brand, role chip, (Front Desk: secondary nav), live status, role switch (one compact row)
 # ====================================================================
-def render_header():
-    role = current_role()
+def _status_chips():
+    ranked = schedule(fetch_orders(), fetch_incidents())
+    late = sum(r['urgency'] == 'LATE' for r in ranked)
+    blocked = sum(r['blocked'] for r in ranked)
+    chips = [f'{len(ranked)} open']
+    if late:
+        chips.append(f'<span class="rr-pill late">{late} late</span>')
+    if blocked:
+        chips.append(f'<span class="rr-pill blocked">{blocked} blocked</span>')
+    return f"<div class='rr-chips'>{' '.join(chips)}</div>"
+
+
+def render_topbar(role):
+    """Returns the selected secondary-view key (Front Desk only; the Kitchen is a single screen)."""
     other = 'server' if role == 'kitchen' else 'kitchen'
-    st.markdown(CSS, unsafe_allow_html=True)
-    left, right = st.columns([5, 2], vertical_alignment='center')
-    left.markdown(f"## {ROLES[role]['icon']} Current view: **{ROLES[role]['label']}**")
-    right.button(f"Switch to {ROLES[other]['label']}", key='rr_switch', use_container_width=True,
-                 on_click=_pick, args=(other,), help='Demo workspace control: changes which screens you see. It does not change permissions or any data.')
-    left.caption('Demo workspace switch — not a login. Orders, alerts and packing progress are shared and kept when you switch.')
+    with st.container(key='rr_topbar'):
+        cols = st.columns([2.4, 4.0, 1.8, 1.9] if role == 'server' else [3.0, 5.0, 2.0], vertical_alignment='center')
+        cols[0].markdown(f"<span class='rr-brand'>{BRAND}</span><span class='rr-rolechip'>{ROLES[role]['label']}</span>", unsafe_allow_html=True)
+        choice = None
+        if role == 'server':
+            choice = cols[1].segmented_control('View', options=list(SERVER_NAV), format_func=SERVER_NAV.get, default='orders',
+                                               key='rr_nav_server', label_visibility='collapsed')
+        cols[-2].markdown(_status_chips(), unsafe_allow_html=True)
+        cols[-1].button(f"Switch to {ROLES[other]['label']}", key='rr_switch', use_container_width=True, on_click=_pick, args=(other,),
+                        help='Changes which screens you see. It does not change permissions or any data.')
+    return choice or 'orders'
 
 
 # ====================================================================
-# UI SECTION: KITCHEN DASHBOARD (Chef workspace)
+# UI SECTION: KITCHEN WORKSPACE — one screen, two panes, draggable divider.
+# The voice pane is ALWAYS rendered so the microphone keeps listening.
 # ====================================================================
 def render_kitchen(screens, key, model):
-    # FEATURE 3: voice panel sits ABOVE the tabs so it stays in one stable place (the microphone keeps listening
-    # while the chef works) and is the first thing on the page.
-    render_voice_panel(key, model)
-    st.divider()
-    t_queue, t_orders, t_legacy = st.tabs(['👨‍🍳 Prep queue & tickets', '📥 Incoming orders', '🗒️ Original typed report'])
-    with t_queue:
-        screens['cook']()
-    with t_orders:
-        screens['intake']()
-    with t_legacy:
-        st.caption("Vincent's original typed chef report. It still works and writes to the same incident list.")
-        screens['legacy_agent']()
+    left, right = st.columns([3, 2], gap='small')                                   # 60 / 40 default; the divider changes it live
+    with left, st.container(key='rr_pane_queue'):
+        with st.expander('Incoming orders'):                                          # was a separate page: kept, but collapsed
+            screens['intake']()
+        screens['cook']()                                                             # FEATURE 2: ticket queue
+    with right, st.container(key='rr_pane_voice'):
+        render_voice_panel(key, model)                                                # FEATURE 3: mic, typed report, recent alerts
+        with st.expander('Manual report (original)'):                                 # was a separate page: kept, but collapsed
+            screens['legacy_agent']()
+    render_splitter('rr_pane_queue', 'rr_pane_voice')                                 # draggable divider (main UI)
 
 
 # ====================================================================
-# UI SECTION: SERVER DASHBOARD (Packer / Front-of-house workspace)
+# UI SECTION: FRONT DESK WORKSPACE
 # ====================================================================
-def render_server(screens):
-    render_server_alerts()  # FEATURE 3: counters + kitchen alerts + recommended actions (auto-refreshing)
-    st.divider()
-    t_pack, t_pickup, t_new, t_notes = st.tabs(['📦 Packing checklist', '🛎️ Pickup & handoff', '📥 Take a new order', 'ℹ️ Notes'])
-    with t_pack:
-        screens['packer']()
-    with t_pickup:
-        screens['front_desk']()
-    with t_new:
-        screens['intake']()
-    with t_notes:
-        screens['notes']()
+def render_server(screens, view):
+    if view == 'orders':
+        render_orders_workspace()
+    else:
+        with st.container(key='rr_pane_secondary'):
+            {'new': screens['intake'], 'classic': lambda: (screens['packer'](), st.divider(), screens['front_desk']()),
+             'notes': screens['notes']}[view]()
 
 
 def run_app(screens, key, model):
     """screens: dict of zero-argument functions from app.py: cook, legacy_agent, intake, packer, front_desk, notes."""
-    render_header()
-    if current_role() == 'kitchen':
+    inject_theme()
+    role = current_role()
+    view = render_topbar(role)
+    if role == 'kitchen':
         render_kitchen(screens, key, model)
     else:
-        render_server(screens)
+        render_server(screens, view)

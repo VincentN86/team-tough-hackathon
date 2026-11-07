@@ -38,13 +38,15 @@ CONFIDENCES = ('high', 'medium', 'low')
 
 # words that mean "this is behind"
 DELAY_WORDS = (r"(?:behind|late|longer|delay(?:ed)?|slow|backed up|forever|behind schedule|needs? another|taking|takes?|running|waiting|"
-               r"more minutes|(?:won't|will not|wont) be (?:off|ready|done|out|up)|(?:ready|off|done|up) in|until|from now)")
+               r"more minutes|(?:will|going to|gonna|'ll) be (?:about |around |another |like )?(?:\d+|[a-z]+(?: [a-z]+)?) ?(?:minutes?|mins?)|(?:won't|will not|wont) be (?:off|ready|done|out|up)|(?:ready|off|done|up) in|until|from now)")
 # "the burger", "pizzas" -> menu item. Fries are deliberately NOT here: "fries" means the Fryer station (see STATION_ALIASES).
 ITEM_ALIASES = {}
 for _name in MENU:
     if _name != 'Fries':
         ITEM_ALIASES[_name.lower()] = _name
         ITEM_ALIASES.setdefault(_name.lower().split()[-1], _name)  # 'sandwich' -> Chicken Sandwich
+# "the burgers are going to be about ten minutes" = ready in ~10 min (only meaningful together with an item/station)
+READY_SOON = r"(?:will|going to|gonna|'ll) be (?:about |around |another |like )?(?:\d+|[a-z]+(?: [a-z]+)?) ?(?:minutes?|mins?)"
 RECOVER_WORDS = (r"(?:back to normal|caught up|back on track|running (?:fine|normal|normally|well)|working again|working now|"
                  r"is fine now|is fine|no longer (?:behind|slow|delayed)|recovered|is back|back up|repaired|is fixed|fixed)")
 # an ingredient phrase (lazy) and what may end it
@@ -143,19 +145,22 @@ def _shortage(c):
         (r"\bno " + ING + r" left\b", 'high'),
         (r"\b(?:we|there)(?:'s| is| are)? ?(?:have )?no " + ING + END, 'high'),
         (r"\b86(?:'d|ed)? " + ING + END, 'high'),
-        (r"\b([a-z]+) (?:is|are) (?:all )?(?:out|gone|finished|86'?d)\b", 'high'),
+        (r"\b([a-z]+)(?:'s| is| are) (?:all )?(?:out|gone|finished|86'?d)\b(?! of)", 'high'),  # "chicken's out", "chicken is gone"
+        (r"\b([a-z]+(?: [a-z]+)?) (?:is|are) off the menu\b", 'high'),
+        (r"^(?:there's |there is |we have |we've got )?no " + ING + r"$", 'medium'),  # bare "no chicken": likely, not certain
     ]
     for pat, conf in personal + clear:
         m = re.search(pat, c)
         if m:
             ing = _ing_from_phrase(m.group(1))
-            if ing:
+            # a station ("fryer's out") or a supply ("out of gloves") is not an ingredient shortage
+            if ing and not _station(ing) and not any(w in ing for w in SUPPLY_WORDS):
                 return ing, conf
     m = re.search(r"\b(?:can't|cannot|can not|unable to) (?:make|do|serve) (?:the |any |more )?" + ING + r"(?: anymore| any more|$)", c)
     if m:  # "we can't make the chicken sandwiches anymore" -> a menu-item availability problem
         ing = _ing_from_phrase(m.group(1))
         if ing in KNOWN_INGREDIENTS:
-            return ing, 'medium'
+            return ing, 'high'  # an explicit "we can't make X anymore" is a clear availability statement
     return None
 
 
@@ -188,7 +193,7 @@ def interpret_rules(text):
             issues.append(_issue('resolve_ingredient', raw, ingredient=norm_ingredient(m.group(1))))
             continue
         # 4) station broken
-        if station and re.search(r"\b(broke|broken|down|not working|isn't working|stopped working|died|out of order)\b", c):
+        if station and re.search(r"\b(broke|broken|down|not working|isn't working|stopped working|died|out of order)\b|(?:'s| is| are) out\b(?! of)", c):
             issues.append(_issue('station_down', raw, station=station))
             continue
         # 5) "no cooked chicken READY" — temporary prep status, not a raw-ingredient shortage
@@ -224,7 +229,8 @@ def interpret_rules(text):
         item = _item(c)
         ing = '' if (item or station) else _ingredient_mention(c)
         if delayish and (item or ing) and (minutes or re.search(r"\b(late|delay(?:ed)?|slow|forever|behind)\b", c)):
-            ready_in = bool(minutes and re.search(r"(?:won't|will not|wont) be (?:off|ready|done|out|up)\b|\b(?:ready|off|done|up) in\b|\bfrom now\b", c))
+            ready_in = bool(minutes and (re.search(r"(?:won't|will not|wont) be (?:off|ready|done|out|up)\b|\b(?:ready|off|done|up) in\b|\bfrom now\b", c)
+                                         or (re.search(READY_SOON, c) and not re.search(r"\b(late|delayed|behind|more|extra|another|longer)\b", c))))
             note = ''
             if item and station and MENU[item]['station'] != station:
                 note = f"You said {station}, but {item} is prepared at {MENU[item]['station']} — applied to the {item.lower()} itself."
@@ -276,6 +282,9 @@ def refine(issues, orders):
         if i['type'] == 'item_delay' and not any(item_matches(it, i['item']) for it in pending):
             i.update(confidence='medium' if i['confidence'] == 'high' else i['confidence'],
                      note=f"No open order has '{i['item']}' still to cook — confirm with the kitchen.")
+        elif i['type'] in ('order_remake', 'order_issue') and i['order_id'] not in open_ids and len(i['order_id']) >= 2                 and len([x for x in open_ids if x.endswith(i['order_id'])]) == 1:
+            full = next(x for x in open_ids if x.endswith(i['order_id']))  # "order 42" -> the one open order #1042
+            i.update(order_id=full, note=f"Heard 'order {i['order_id']}' — matched to open order #{full}.")
         elif i['type'] in ('order_remake', 'order_issue') and i['order_id'] not in open_ids:
             i.update(confidence='low', note=f"Order #{i['order_id']} isn't an open order.",
                      question=f"I couldn't find open order #{i['order_id']} — which order?")

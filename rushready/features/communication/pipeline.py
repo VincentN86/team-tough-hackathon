@@ -59,3 +59,10 @@ def process_utterance(text, key='', model='openrouter/auto', recent=None, now=No
     else:
         entry['status'] = 'repeat'
     return entry
+
+
+def current_alerts():
+    """{order_id: alert} for every OPEN order, from the live shared data. Read-only; this is what the Front Desk reads
+    (via the public `order_alerts` in __init__.py) so it never needs to know how alerts are computed."""
+    store.init_tables()
+    return {a['order']['id']: a for a in impact.build_alerts(fetch_orders(), fetch_incidents(), store.fetch_flags(), store.fetch_alert_rows())}

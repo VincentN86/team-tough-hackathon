@@ -13,7 +13,7 @@ from ai_agent import parse_issue,transcribe_wav,inspect_packing_photo
 from roles import ensure_role_selected,run_app          # role-based navigation (integration layer)
 from features.communication import reset_feature_data   # Feature 3 (Liz): clears its tables on demo reset
 
-st.set_page_config(page_title='RushReady • NOVA 2026',page_icon='🍔',layout='wide')
+st.set_page_config(page_title='BREDDY',layout='wide',initial_sidebar_state='collapsed')
 init_db()
 
 st.markdown('''<style>
@@ -29,7 +29,7 @@ except (FileNotFoundError,KeyError):
     default_model='openrouter/auto'
 
 with st.sidebar:
-    st.title('⚙️ RushReady')
+    st.title('BREDDY')
     st.caption('NOVA hackathon • Fictional order data')
     KEY=os.environ.get('OPENROUTER_API_KEY','') or configured
     if KEY:
@@ -50,9 +50,8 @@ with st.sidebar:
     if st.button('Refresh', use_container_width=True):
         st.rerun()
 
-ensure_role_selected()  # welcome screen: pick Kitchen or Front Desk (stops here until chosen)
-st.title('🍔 RushReady')
-st.caption('One order feed. Smarter kitchen priorities. Safer handoffs.  •  DEMO ONLY — no live DoorDash/Uber Eats integrations or customer notifications.')
+ensure_role_selected()  # landing screen: pick Kitchen or Front Desk (stops here until chosen)
+# (page title + demo caption removed: the compact top bar in roles.py replaces them. DEMO ONLY - no live DoorDash/Uber Eats or customer messages.)
 
 
 def clock(t):
@@ -61,10 +60,10 @@ def clock(t):
 
 def urgency_chip(row):
     val=row['urgency']
-    if val=='BLOCKED': st.error('🛑 Ingredient unavailable')
-    elif val=='LATE': st.error(f"⚠️ Predicted {row['late_minutes']} min late")
-    elif val=='RISK': st.warning(f"⚠️ At risk • {row['slack']} min slack")
-    else: st.success(f"✓ On track • {row['slack']} min slack")
+    if val=='BLOCKED': st.error('Ingredient unavailable')
+    elif val=='LATE': st.error(f"Predicted {row['late_minutes']} min late")
+    elif val=='RISK': st.warning(f"At risk • {row['slack']} min slack")
+    else: st.success(f"On track • {row['slack']} min slack")
 
 
 def order_header(o):
@@ -130,9 +129,11 @@ def screen_intake():  # was: with tabs[0]  (Feature 1: order intake)
         intake_feed()
 
 def screen_cook():  # was: with tabs[1]  (Feature 2: kitchen queue/prioritization)
-    st.subheader('Kitchen tickets — ranked by deadline risk')
-    st.caption('Priority uses estimated latest-start times, not simple arrival order. Each station processes one ticket line at a time in this demo.')
-    station_filter=st.selectbox('Cooking station', ['All stations']+STATIONS)
+    st.subheader('Kitchen Tickets')
+    pick,help_col=st.columns([5,1],vertical_alignment='bottom')
+    station_filter=pick.selectbox('Cooking station', ['All stations']+STATIONS)
+    with help_col.popover('Help'):  # was a caption above the tickets (UI-only move; no logic change)
+        st.caption('Priority uses estimated latest-start times, not simple arrival order. Each station processes one ticket line at a time in this demo.')
     @st.fragment(run_every='5s')
     def cook_queue():
         ranked=schedule(fetch_orders(),fetch_incidents())
@@ -142,7 +143,7 @@ def screen_cook():  # was: with tabs[1]  (Feature 2: kitchen queue/prioritizatio
         stt[2].metric('Blocked',sum(x['blocked'] for x in ranked))
         for station,name,count in batch_hints(fetch_orders()):
             if station_filter=='All stations' or station_filter==station:
-                st.info(f'💡 Batching hint: **{count}× {name}** needed at {station}')
+                st.info(f'Batching hint: **{count}× {name}** needed at {station}')
         for priority,o in enumerate(ranked,start=1):
             visible=[i for i in o['items'] if station_filter=='All stations' or i['station']==station_filter]
             if not visible: continue

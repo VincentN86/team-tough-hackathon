@@ -60,6 +60,8 @@ def _headline(oid, sev, timing, causes):
     """One plain-English sentence for the server, built from the actual causes (never static text)."""
     by = lambda kind: [c for c, _, k in causes if k == kind]  # noqa: E731
     if sev == 'on_track':
+        if timing['category'] != 'on_track':  # not hit by any kitchen issue, but tight on its own schedule
+            return f"Order #{oid} is not affected by any reported kitchen issue (its own schedule is tight: {timing['slack']} min of slack)."
         return f'Order #{oid} is on track.'
     if sev == 'possible':
         return f"Order #{oid} may be affected — {_joined([c for c, _, _ in causes])} (unconfirmed, so nothing has changed yet)."

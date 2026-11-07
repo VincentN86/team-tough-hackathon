@@ -41,9 +41,14 @@ def test_clear_shortage_variants_are_high_confidence(text):
 
 
 def test_ambiguous_phrasings_are_medium_not_ignored():
-    for text in ['I have no chicken.', "We can't make the chicken sandwiches anymore."]:
+    for text in ['I have no chicken.', 'No chicken.']:
         i = parse(text)
         assert i and i[0]['type'] == 'ingredient_unavailable' and i[0]['ingredient'] == 'chicken' and i[0]['confidence'] == 'medium', text
+
+
+def test_cant_make_menu_item_is_a_clear_shortage():
+    i = parse("We can't make the chicken sandwiches anymore.")
+    assert [(x['type'], x['ingredient'], x['confidence']) for x in i] == [('ingredient_unavailable', 'chicken', 'high')]
 
 
 def test_prep_status_is_not_a_shortage():
