@@ -28,7 +28,7 @@ def render_voice_panel(key='', model='openrouter/auto'):
     ss.setdefault('vc_seen', set())   # utterance ids already processed
     ss.setdefault('vc_recent', {})    # repeat protection
 
-    st.markdown('### 🎙️ Tell the front desk — just talk while you cook')
+    st.markdown('#### Voice Communication')
 
     # ----- UI SECTION: MICROPHONE CONTROLS (component keeps its place on reruns; keep this call position stable)
     value = _voice(key='chef_voice_live', default=None)
@@ -39,8 +39,9 @@ def render_voice_panel(key='', model='openrouter/auto'):
 
     # ----- UI SECTION: TYPED FALLBACK (same pipeline as speech)
     with st.form('vc_typed', clear_on_submit=True, border=False):
-        c1, c2 = st.columns([6, 1], vertical_alignment='bottom')
-        typed = c1.text_input('Or type a report (no microphone needed)', placeholder="We're out of chicken and the fryer is ten minutes behind")
+        c1, c2 = st.columns([3, 1], vertical_alignment='bottom')
+        typed = c1.text_input('Type a report', key='vc_typed_text', label_visibility='collapsed',
+                              placeholder="Type a report, e.g. the fryer is ten minutes behind")
         sent = c2.form_submit_button('Send', use_container_width=True, type='primary')
     if sent and typed.strip():
         _handle(typed, key, model)
@@ -60,25 +61,24 @@ def _handle(text, key, model):
 # ====================================================================
 # UI SECTION: VOICE TRANSCRIPT / WHAT THE SYSTEM DID
 # ====================================================================
-STATUS_TEXT = {'published': '✅ Sent to Front Desk', 'provisional': '🟡 Sent as possible issue', 'clarify': '❓ Not sure — nothing changed',
-               'ignored': '— Ignored (not about orders)', 'repeat': '↺ Repeat'}
+STATUS_TEXT = {'published': 'Sent to Front Desk', 'provisional': 'Sent as possible issue', 'clarify': 'Not sure — nothing changed',
+               'ignored': 'Ignored (not about orders)', 'repeat': 'Repeat'}
 
 
 def _render_feed():
     feed = st.session_state['vc_feed']
     if not feed:
-        st.caption('Nothing heard yet. Relevant statements appear here and reach the Front Desk automatically.')
         return
     undone = {r['id'] for r in store.fetch_reports() if r['undone']}
-    for n, e in enumerate(feed):
+    for n, e in enumerate(feed[:5]):   # recent only: the pane stays compact (full history is kept in the Front Desk 'Kitchen activity')
         lines = '<br>'.join(html.escape(x) for x in e['lines'])
         st.markdown(f"<div class='rr-feed {e['status']}'><b>{STATUS_TEXT[e['status']]}</b> · “{html.escape(e['text'])}”"
                     f"<br><small>{lines}</small></div>", unsafe_allow_html=True)
         for o in e['clarify']:
-            st.caption('❓ ' + (o['question'] or o['note'] or 'Please repeat with the station / order and minutes.'))
+            st.caption('Question: ' + (o['question'] or o['note'] or 'Please repeat with the station / order and minutes.'))
         rid = e['report_id']
         if rid and rid not in undone:
-            if st.button('↩ Undo this report', key=f'vc_undo_{rid}_{n}'):
+            if st.button('Undo this report', key=f'vc_undo_{rid}_{n}'):
                 store.undo_report(rid)
                 st.rerun()
         elif rid:
@@ -92,11 +92,12 @@ def _render_advisories():
     flags = [f for f in store.fetch_flags() if f['active'] and f['certainty'] == 'provisional']
     if not flags:
         return
-    st.markdown('**Possible issues sent to the Front Desk** — confirm or dismiss when you have a second')
+    st.markdown('**Possible issues** — sent to Front Desk as tentative')
     for f in flags:
         k = f['kind']
         with st.container(border=True):
-            c1, c2, c3 = st.columns([4, 2, 1.2], vertical_alignment='center')
+            c1 = st.container()
+            c2, c3 = st.columns([2, 1], vertical_alignment='center')
             c1.write({'ingredient_unavailable': f"Possible: **{f['ingredient']}** unavailable",
                       'ingredient_low': f"Low stock: **{f['ingredient']}**",
                       'prep_wait': f"Cooked **{f['ingredient']}** not ready yet (not a shortage)",
@@ -126,7 +127,7 @@ def _render_active():
     flags = [f for f in store.fetch_flags() if f['active'] and f['certainty'] == 'confirmed']
     if not incs and not flags:
         return
-    with st.expander(f'Active reports ({len(incs) + len(flags)}) - resolve anything that is no longer true'):
+    with st.expander(f'Active reports ({len(incs) + len(flags)})'):
         for x in incs:
             c1, c2 = st.columns([5, 1])
             c1.write(x['ingredient'] + ' unavailable' if x['ingredient'] else f"{x['station']} {x['delay_minutes']} min behind")
