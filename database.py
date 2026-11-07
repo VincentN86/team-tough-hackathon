@@ -103,7 +103,14 @@ def reset_demo():
 
 
 def create_order(source, recipient, minutes_until_pickup, lines):
-    if source not in SOURCES or recipient not in RECIPIENTS:
+    # Keep legacy handoff labels valid; intake may also supply "Name · Handoff".
+    valid_recipient = isinstance(recipient, str) and recipient in RECIPIENTS
+    if isinstance(recipient, str) and ' · ' in recipient:
+        name, handoff = recipient.rsplit(' · ', 1)
+        valid_recipient = (bool(name.strip()) and len(name) <= 80
+                           and handoff in RECIPIENTS
+                           and not any(ord(c) < 32 for c in name))
+    if source not in SOURCES or not valid_recipient:
         raise ValueError('Invalid source or recipient type')
     if not lines or any(n not in MENU or int(q)<1 for n,q,_,_ in lines):
         raise ValueError('Choose at least one valid food item and quantity')

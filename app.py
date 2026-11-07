@@ -5,11 +5,12 @@ from datetime import datetime, timezone
 import os
 
 import streamlit as st
-from database import (MENU,SOURCES,RECIPIENTS,STATIONS,init_db,reset_demo,create_order,
+from database import (STATIONS,init_db,reset_demo,
                       fetch_orders,fetch_incidents,update_item,verify_item_packed,
                       verify_special,seal_order,handoff_order,add_incident,resolve_incident)
 from scheduler import schedule,batch_hints
 from ai_agent import parse_issue,transcribe_wav,inspect_packing_photo
+from intake import render_intake
 
 st.set_page_config(page_title='RushReady • NOVA 2026',page_icon='🍔',layout='wide')
 init_db()
@@ -89,41 +90,7 @@ def incident_summary(o):
 tabs=st.tabs(['📥 Order Intake','👨‍🍳 Cook & AI Agent','📦 Packer','🛎️ Front Desk','📊 Workflow'])
 
 with tabs[0]:
-    left,right=st.columns([1,1.6],gap='large')
-    with left:
-        st.subheader('Simulate a new order')
-        st.caption('Choose a platform to simulate a unified feed. No platform API is connected.')
-        with st.form('new_order',clear_on_submit=False):
-            source=st.selectbox('Source',SOURCES)
-            recipient=st.selectbox('Handoff to',RECIPIENTS)
-            minutes=st.slider('Pickup deadline: minutes from now',5,90,25,1)
-            chosen=st.multiselect('Food items',list(MENU),default=['Burger','Fries'])
-            qty=st.number_input('Quantity of EACH selected item',1,8,1)
-            modifier=st.text_input('Modifier for first item (optional)',placeholder='No onions')
-            allergy=st.text_input('Allergy instruction for first item (optional)',placeholder='Employee must verify')
-            submitted=st.form_submit_button('Add incoming order',type='primary',use_container_width=True)
-        if submitted:
-            if not chosen:
-                st.warning('Choose at least one menu item.')
-            else:
-                lines=[(name,qty, modifier if idx==0 else '',allergy if idx==0 else '') for idx,name in enumerate(chosen)]
-                new_id=create_order(source,recipient,minutes,lines)
-                st.success(f'Order #{new_id} added to the shared database.')
-                st.rerun()
-    with right:
-        st.subheader('All platforms → one feed')
-        @st.fragment(run_every='5s')
-        def intake_feed():
-            orders=fetch_orders()
-            for o in sorted(orders,key=lambda x:x['received_at'],reverse=True):
-                with st.container(border=True):
-                    order_header(o)
-                    st.write(' · '.join(item_text(i) for i in o['items']))
-                    if any(i['modifier'] for i in o['items']):
-                        st.info('Modifiers: '+'; '.join(f"{i['name']}: {i['modifier']}" for i in o['items'] if i['modifier']))
-                    if any(i['allergy'] for i in o['items']):
-                        st.warning('ALLERGY INSTRUCTIONS: Staff must verify')
-        intake_feed()
+    render_intake()
 
 with tabs[1]:
     st.subheader('Kitchen tickets — ranked by deadline risk')
