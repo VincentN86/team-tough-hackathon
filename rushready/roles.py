@@ -1,11 +1,11 @@
-"""MAIN-APP SHELL — role state, compact top bar, secondary navigation and workspace composition.  Owner: main BREDDY UI.
+"""MAIN-APP SHELL — role state, compact top bar, secondary navigation and workspace composition.  Owner: main BREADY UI.
 
 app.py keeps the team's screens as plain functions (intake, cook queue, packer, front desk ...). This file decides WHICH screens each
 role sees and how they are arranged. It holds no business logic and no data: both roles read/write the SAME SQLite database, so
 switching roles never resets anything.   NOTE: the role lives in st.session_state (per browser tab) — a demo switch, NOT authentication.
 
 Composition (search for 'FEATURE' to find where feature code is plugged in):
-    Kitchen    ONE screen. left pane: Feature 2 queue (screens['cook']) + collapsed 'Incoming orders'
+    Kitchen    ONE screen. left pane: ticket module (tickets.py: vertical tab rail + selected ticket) + collapsed 'Incoming orders'
                right pane: Feature 3 voice panel (render_voice_panel) + collapsed original typed report.
                A draggable divider (ui/splitpane.py) sits between the panes (default 60/40).
     Front Desk left pane: order rows + packing view (frontdesk.py)  right pane: Feature 3 alert cards (render_server_alerts)
@@ -19,12 +19,13 @@ WHERE TO EDIT
 """
 import streamlit as st
 
-from database import fetch_incidents, fetch_orders
-from features.communication import render_voice_panel  # FEATURE 3
+from database import STATIONS, fetch_incidents, fetch_orders
+from features.communication import order_alerts, render_voice_panel  # FEATURE 3
 from frontdesk import render_orders_workspace           # Front Desk layout (main UI)
 from landing import BRAND, render_role_picker
 from scheduler import schedule                           # core: only to show late/blocked counts in the top bar
 from ui.splitpane import render_splitter
+from tickets import render_ticket_workspace            # ticket module (Jiena's ticket design, vertical tab rail)
 from ui.theme import inject_theme
 
 ROLE_KEY = 'rr_role'
@@ -88,15 +89,18 @@ def render_topbar(role):
 # ====================================================================
 def render_kitchen(screens, key, model):
     left, right = st.columns([3, 2], gap='small')                                   # 60 / 40 default; the divider changes it live
-    with left, st.container(key='rr_pane_queue'):
-        with st.expander('Incoming orders'):                                          # was a separate page: kept, but collapsed
-            screens['intake']()
-        screens['cook']()                                                             # FEATURE 2: ticket queue
+    # The VOICE pane is filled FIRST (it sits on the right either way): a spoken or typed report is saved to the database during this run,
+    # so the tickets on the left are then drawn from fresh data and reprioritise immediately instead of one refresh later.
     with right, st.container(key='rr_pane_voice'):
         render_voice_panel(key, model)                                                # FEATURE 3: mic, typed report, recent alerts
         with st.expander('Manual report (original)'):                                 # was a separate page: kept, but collapsed
             screens['legacy_agent']()
-    render_splitter('rr_pane_queue', 'rr_pane_voice')                                 # draggable divider (main UI)
+    with left, st.container(key='rr_pane_queue'):
+        with st.expander('Incoming orders'):                                          # was a separate page: kept, but collapsed
+            screens['intake']()
+        # ticket module: priority-ordered vertical tab rail + selected ticket. alerts_fn passes Feature 3's revised ETAs / delay messages in.
+        render_ticket_workspace(alerts_fn=order_alerts, stations=STATIONS)
+    render_splitter('rr_pane_queue', 'rr_pane_voice', min_left=420)                                 # draggable divider (main UI)
 
 
 # ====================================================================

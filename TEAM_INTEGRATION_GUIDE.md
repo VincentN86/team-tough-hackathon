@@ -130,8 +130,8 @@ focus ring on keyboard Tab, acknowledge/View Order work, 77 tests pass. **Limita
 Queue/Even/Voice presets); markdown HTML blocks need a `margin-bottom:1rem` because Streamlit adds `-1rem`; the Feature 2 queue pane is still long
 and scrolls inside its pane; the microphone and the Chrome speech engine can't be tested headlessly.
 
-## BREDDY rebrand + Kitchen redesign (latest)
-**Brand/identity:** product name is BREDDY (user-visible only: landing, top bar, browser tab, sidebar title). Package/repo/DB/internal `rr_` names are unchanged.
+## BREADY rebrand + Kitchen redesign (latest)
+**Brand/identity:** product name is BREADY (user-visible only: landing, top bar, browser tab, sidebar title). Package/repo/DB/internal `rr_` names are unchanged.
 Palette: white `#FFFFFF`, Cod Gray `#191919`, red `#FF3008` (primary actions + selected states). Font: Lexend (Google Fonts `@import` in `ui/theme.py`;
 falls back to Segoe UI/Arial offline). Semantic colours (late crimson, blocked Cod Gray, risk amber, ok green) are deliberately NOT the brand red.
 White-on-red is 3.7:1, so red buttons use bold 17px+ text; small text never uses brand red.
@@ -150,3 +150,18 @@ it, the panes simply stay at 60/40 (nothing else depends on it).
 | `ui/theme.py`, `.streamlit/config.toml`, `landing.py`, `roles.py`, `ui/splitpane.py`, `ui/splitter/index.html` | Main UI | brand, palette, font, kitchen shell, divider |
 | `app.py` | Shared | page title, sidebar title, `screen_cook`: header "Kitchen Tickets", the long caption moved into a "Help" popover, emojis removed from status chips/hints (visual only, **Feature 2 owner to review**) |
 | `features/communication/voice_component/index.html`, `ui_kitchen.py`, `ui_server.py` | Feature 3 | red mic button, 3 states (Off/Listening/Processing), paragraph + "Nothing heard yet" removed, compact "Mic help", shorter labels |
+
+## Kitchen tickets: Jiena's paper-ticket design as a vertical tab rail (latest)
+**Source:** Jiena Lee's `tickets` commit on `origin/main` (`796e717`, `rushready/app.py`: `ticket_html()`, `opened_ticket()`, the `.ticket`/`.bt-*` CSS, the invisible-button tab trick).
+Her `origin/feature2` branch (`kitchen-display/`, a standalone JavaScript prototype) is a different thing and is NOT used. Nothing from either branch was merged;
+the markup/CSS was ported into **`rushready/tickets.py`** (new, ticket module) and adapted. Her branch is untouched.
+`tickets.py` reads the existing `scheduler.schedule()` (unchanged) for order + urgency, the DB for items, and takes Feature 3's `order_alerts()` through an
+`alerts_fn` argument from `roles.py` (the ticket module never imports the communication package, and Feature 3 never imports the ticket module).
+**Layout:** left pane = collapsed "Incoming orders", station filter, counts, collapsed batching hints, then `[dark tab rail ~30% (150-250px) | selected ticket]`.
+Tabs are in priority order (highest first); selection is stored by order ID (`st.session_state['open_ticket']`), defaults to the top-priority order, and stays on the same
+order when priorities reshuffle. Narrow pane: secondary tab lines hide (container query) and the divider will not go below 420px for the left pane.
+**Fonts:** ticket text keeps Jiena's Courier New (`--tk-font` in `tickets.py`, one place to change); brand + app headings stay Lexend.
+**Order of drawing:** `roles.render_kitchen` fills the voice pane first (still displayed on the right) so a report saved this run is already in the DB when the tickets are drawn.
+`screen_cook` in `app.py` (the earlier ticket list) is no longer used by the Kitchen but was left in place for the Feature 2 owner to retire or reuse.
+**Contrast:** light-grey canvas -> white panels -> grey rows/inputs -> dark top bar / ticket rail; secondary buttons have a grey fill and a Cod Gray border. All text pairs
+>= 4.5:1 except white-on-brand-red buttons (3.7:1, bold large text only).

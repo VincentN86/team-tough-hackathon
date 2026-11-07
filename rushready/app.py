@@ -13,7 +13,7 @@ from ai_agent import parse_issue,transcribe_wav,inspect_packing_photo
 from roles import ensure_role_selected,run_app          # role-based navigation (integration layer)
 from features.communication import reset_feature_data   # Feature 3 (Liz): clears its tables on demo reset
 
-st.set_page_config(page_title='BREDDY',layout='wide',initial_sidebar_state='collapsed')
+st.set_page_config(page_title='BREADY',layout='wide',initial_sidebar_state='collapsed')
 init_db()
 
 st.markdown('''<style>
@@ -29,7 +29,7 @@ except (FileNotFoundError,KeyError):
     default_model='openrouter/auto'
 
 with st.sidebar:
-    st.title('BREDDY')
+    st.title('BREADY')
     st.caption('NOVA hackathon • Fictional order data')
     KEY=os.environ.get('OPENROUTER_API_KEY','') or configured
     if KEY:

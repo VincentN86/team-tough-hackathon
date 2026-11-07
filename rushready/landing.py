@@ -15,7 +15,7 @@ import streamlit as st
 
 from ui.theme import inject_css, root_css
 
-BRAND = 'BREDDY'   # the product name, shown in capitals everywhere
+BRAND = 'BREADY'   # the product name, shown in capitals everywhere
 TITLE = BRAND
 
 # ====================================================================

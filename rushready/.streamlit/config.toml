@@ -1,10 +1,10 @@
-# BREDDY — Streamlit-level theme. Keep primaryColor equal to TOKENS['accent'] in ui/theme.py.
+# BREADY — Streamlit-level theme. Keep primaryColor equal to TOKENS['accent'] in ui/theme.py.
 # (The Lexend font itself is loaded by ui/theme.py with a Google Fonts @import, scoped to the app.)
 [theme]
 base = "light"
-primaryColor = "#FF3008"        # BREDDY red: primary buttons, selected states
-backgroundColor = "#FFFFFF"     # white
-secondaryBackgroundColor = "#F6F6F6"
+primaryColor = "#FF3008"        # BREADY red: primary buttons, selected states
+backgroundColor = "#EEEEEE"     # light-grey canvas; panels are white (see ui/theme.py LAYERS)
+secondaryBackgroundColor = "#E2E2E2"
 textColor = "#191919"           # Cod Gray
 font = "sans serif"
 
