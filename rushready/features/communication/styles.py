@@ -1,6 +1,6 @@
 """VISUAL STYLING for Feature 3 (alert cards, voice feed rows).  Owner: Feature 3 (Liz)
 
-Colours come from the shared RushReady CSS variables (--rr-late, --rr-risk ...). The second argument of var() is a fallback, so this
+Colours come from the shared BREADY CSS variables (--rr-late, --rr-risk ...). The second argument of var() is a fallback, so this
 feature still looks right when run without the main app's theme. Edit SEVERITY for the label shown on each alert, CSS for spacing/shape.
 """
 import streamlit as st

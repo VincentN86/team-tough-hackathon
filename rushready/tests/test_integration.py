@@ -61,7 +61,7 @@ def test_full_workflow(tmp_path):
     assert not at.exception and role(at) == 'kitchen'
     t = texts(at)
     assert 'Priority 1' in t and 'Voice Communication' in t
-    assert 'BREDDY' in t and 'RushReady' not in t                    # rebrand
+    assert 'BREADY' in t and 'RushReady' not in t                    # rebrand
     assert 'Incoming orders' not in [b.label for b in at.button]      # no separate navigation: it is a collapsed section now
     assert not at.get('button_group') or all(g.options != ['Queue', 'Even', 'Voice'] for g in at.get('button_group'))   # layout selector is gone
     for gone in ('Hands-free', 'Nothing heard yet', 'Queue', 'Typed report'):
@@ -188,3 +188,15 @@ def test_busy_shift_many_orders_and_alerts(tmp_path):
     assert any('3× Burger' not in m.value and '1× Chicken Sandwich' in m.value for m in at.markdown)
     click(at, 'Back to orders')
     assert 'Awaiting food' in texts(at)
+
+
+def test_individual_ticket_keeps_shared_workflow(tmp_path):
+    at = boot(tmp_path)
+    click(at, 'Enter Kitchen')
+    at.selectbox(key='kitchen_ticket_picker').select('1044').run()
+    assert not at.exception
+    item = next(o for o in database.fetch_orders() if o['id'] == '1044')['items'][0]
+    press(at, f"bt_start_{item['id']}")
+    assert next(o for o in database.fetch_orders() if o['id'] == '1044')['status'] == 'cooking'
+    press(at, f"bt_ready_{item['id']}")
+    assert next(o for o in database.fetch_orders() if o['id'] == '1044')['items'][0]['status'] == 'ready'

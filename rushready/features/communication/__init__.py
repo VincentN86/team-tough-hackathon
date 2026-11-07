@@ -1,6 +1,6 @@
 """Feature 3 — AI Voice Communication Agent (owner: Liz).
 
-PUBLIC API — the rest of RushReady should only import these names:
+PUBLIC API — the rest of BREADY should only import these names:
     render_voice_panel(key, model)   chef-side microphone + live feed        (ui_kitchen.py)
     render_server_alerts(on_view)    front-desk alert pane (compact cards)    (ui_server.py)
     order_alerts()                   {order_id: alert} read-only, live data   (pipeline.py)

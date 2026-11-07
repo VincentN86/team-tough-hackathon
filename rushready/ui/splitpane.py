@@ -1,4 +1,4 @@
-"""MAIN-APP UI — draggable divider between two side-by-side panes.  Owner: main BREDDY UI (shell). Not a feature.
+"""MAIN-APP UI — draggable divider between two side-by-side panes.  Owner: main BREADY UI (shell). Not a feature.
 
 Streamlit has no resizable columns, so this is a tiny zero-height custom component (ui/splitter/index.html). Call
 `render_splitter('rr_pane_queue', 'rr_pane_voice')` right AFTER the two `st.columns` panes were drawn inside keyed containers

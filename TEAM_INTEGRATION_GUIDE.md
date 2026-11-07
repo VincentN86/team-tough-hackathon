@@ -150,3 +150,11 @@ it, the panes simply stay at 60/40 (nothing else depends on it).
 | `ui/theme.py`, `.streamlit/config.toml`, `landing.py`, `roles.py`, `ui/splitpane.py`, `ui/splitter/index.html` | Main UI | brand, palette, font, kitchen shell, divider |
 | `app.py` | Shared | page title, sidebar title, `screen_cook`: header "Kitchen Tickets", the long caption moved into a "Help" popover, emojis removed from status chips/hints (visual only, **Feature 2 owner to review**) |
 | `features/communication/voice_component/index.html`, `ui_kitchen.py`, `ui_server.py` | Feature 3 | red mic button, 3 states (Off/Listening/Processing), paragraph + "Nothing heard yet" removed, compact "Mic help", shorter labels |
+
+## Combined BREADY integration
+
+The repository root now launches the canonical `rushready/app.py` through a small wrapper. Feature 1 lives in `rushready/intake.py` and `intake.css`, uses the same SQLite order store as Kitchen, AI communication, packing, and Front Desk, and supports named recipients without changing stored statuses or schema. Internal `rr_` keys and `RUSHREADY_DB` remain unchanged.
+
+The individual kitchen ticket view previously on `main` is retained in `rushready/tickets.py`, accessible under Kitchen → Individual kitchen tickets, with its shared Start/Ready actions. The feature2 browser prototype is preserved under `rushready/kitchen-display`; its in-memory demo remains separate from Streamlit.
+
+Validation at integration: 106 Python tests and 48 kitchen-display JavaScript tests passed. Browser smoke checks covered the role shell, kitchen, intake details, and Front Desk using an isolated demo database. Live microphone recognition and external AI calls were not exercised.

@@ -1,4 +1,4 @@
-"""MAIN-APP SHELL — role state, compact top bar, secondary navigation and workspace composition.  Owner: main BREDDY UI.
+"""MAIN-APP SHELL — role state, compact top bar, secondary navigation and workspace composition.  Owner: main BREADY UI.
 
 app.py keeps the team's screens as plain functions (intake, cook queue, packer, front desk ...). This file decides WHICH screens each
 role sees and how they are arranged. It holds no business logic and no data: both roles read/write the SAME SQLite database, so
@@ -91,6 +91,8 @@ def render_kitchen(screens, key, model):
     with left, st.container(key='rr_pane_queue'):
         with st.expander('Incoming orders'):                                          # was a separate page: kept, but collapsed
             screens['intake']()
+        with st.expander('Individual kitchen tickets'):
+            screens['tickets']()
         screens['cook']()                                                             # FEATURE 2: ticket queue
     with right, st.container(key='rr_pane_voice'):
         render_voice_panel(key, model)                                                # FEATURE 3: mic, typed report, recent alerts

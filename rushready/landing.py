@@ -1,4 +1,4 @@
-"""MAIN-APP UI — opening role-selection screen (colours from ui/theme.py).  Owner: main RushReady app (Feature 1 / shell).  NOT part of any feature package.
+"""MAIN-APP UI — opening role-selection screen (colours from ui/theme.py).  Owner: main BREADY app (Feature 1 / shell).  NOT part of any feature package.
 
 Pure presentation: it draws the title + two role cards and calls `on_pick(role)` when a button is pressed. It holds no business
 logic, reads no database and imports nothing from `features/`. roles.py owns the role state and calls render_role_picker().
@@ -15,7 +15,7 @@ import streamlit as st
 
 from ui.theme import inject_css, root_css
 
-BRAND = 'BREDDY'   # the product name, shown in capitals everywhere
+BRAND = 'BREADY'   # the product name, shown in capitals everywhere
 TITLE = BRAND
 
 # ====================================================================

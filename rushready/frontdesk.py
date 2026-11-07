@@ -1,4 +1,4 @@
-"""MAIN-APP UI — Front Desk workspace layout.  Owner: main RushReady UI (shell). Contains NO feature logic.
+"""MAIN-APP UI — Front Desk workspace layout.  Owner: main BREADY UI (shell). Contains NO feature logic.
 
 Two panes that stay visible together and scroll INSIDE themselves (the page does not scroll):
     LEFT  (rr_pane_orders)  compact order rows grouped by what to do next; picking one opens the focused packing view in this same pane

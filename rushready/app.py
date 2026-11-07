@@ -1,4 +1,4 @@
-"""RushReady NOVA 2026 — Front House demo.
+"""BREADY NOVA 2026 — Front House demo.
 Run with: python3 -m streamlit run app.py
 """
 from datetime import datetime, timezone
@@ -10,10 +10,12 @@ from database import (MENU,SOURCES,RECIPIENTS,STATIONS,init_db,reset_demo,create
                       verify_special,seal_order,handoff_order,add_incident,resolve_incident)
 from scheduler import schedule,batch_hints
 from ai_agent import parse_issue,transcribe_wav,inspect_packing_photo
+from intake import render_intake
+from tickets import render_tickets
 from roles import ensure_role_selected,run_app          # role-based navigation (integration layer)
 from features.communication import reset_feature_data   # Feature 3 (Liz): clears its tables on demo reset
 
-st.set_page_config(page_title='BREDDY',layout='wide',initial_sidebar_state='collapsed')
+st.set_page_config(page_title='BREADY',layout='wide',initial_sidebar_state='collapsed')
 init_db()
 
 st.markdown('''<style>
@@ -29,7 +31,7 @@ except (FileNotFoundError,KeyError):
     default_model='openrouter/auto'
 
 with st.sidebar:
-    st.title('BREDDY')
+    st.title('BREADY')
     st.caption('NOVA hackathon • Fictional order data')
     KEY=os.environ.get('OPENROUTER_API_KEY','') or configured
     if KEY:
@@ -91,42 +93,9 @@ def incident_summary(o):
 
 # Each former tab is now a plain function (bodies unchanged). roles.py decides which role shows which screens.
 
-def screen_intake():  # was: with tabs[0]  (Feature 1: order intake)
-    left,right=st.columns([1,1.6],gap='large')
-    with left:
-        st.subheader('Simulate a new order')
-        st.caption('Choose a platform to simulate a unified feed. No platform API is connected.')
-        with st.form('new_order',clear_on_submit=False):
-            source=st.selectbox('Source',SOURCES)
-            recipient=st.selectbox('Handoff to',RECIPIENTS)
-            minutes=st.slider('Pickup deadline: minutes from now',5,90,25,1)
-            chosen=st.multiselect('Food items',list(MENU),default=['Burger','Fries'])
-            qty=st.number_input('Quantity of EACH selected item',1,8,1)
-            modifier=st.text_input('Modifier for first item (optional)',placeholder='No onions')
-            allergy=st.text_input('Allergy instruction for first item (optional)',placeholder='Employee must verify')
-            submitted=st.form_submit_button('Add incoming order',type='primary',use_container_width=True)
-        if submitted:
-            if not chosen:
-                st.warning('Choose at least one menu item.')
-            else:
-                lines=[(name,qty, modifier if idx==0 else '',allergy if idx==0 else '') for idx,name in enumerate(chosen)]
-                new_id=create_order(source,recipient,minutes,lines)
-                st.success(f'Order #{new_id} added to the shared database.')
-                st.rerun()
-    with right:
-        st.subheader('All platforms → one feed')
-        @st.fragment(run_every='5s')
-        def intake_feed():
-            orders=fetch_orders()
-            for o in sorted(orders,key=lambda x:x['received_at'],reverse=True):
-                with st.container(border=True):
-                    order_header(o)
-                    st.write(' · '.join(item_text(i) for i in o['items']))
-                    if any(i['modifier'] for i in o['items']):
-                        st.info('Modifiers: '+'; '.join(f"{i['name']}: {i['modifier']}" for i in o['items'] if i['modifier']))
-                    if any(i['allergy'] for i in o['items']):
-                        st.warning('ALLERGY INSTRUCTIONS: Staff must verify')
-        intake_feed()
+def screen_intake():
+    render_intake()
+
 
 def screen_cook():  # was: with tabs[1]  (Feature 2: kitchen queue/prioritization)
     st.subheader('Kitchen Tickets')
@@ -336,5 +305,5 @@ def screen_notes():  # was: with tabs[4]
 
 
 # ---- ROLE-BASED APP: Kitchen vs Front Desk (see roles.py). Feature 3 is plugged in there. ----
-run_app({'cook':screen_cook,'legacy_agent':screen_legacy_agent,'intake':screen_intake,'packer':screen_packer,
+run_app({'cook':screen_cook,'tickets':render_tickets,'legacy_agent':screen_legacy_agent,'intake':screen_intake,'packer':screen_packer,
          'front_desk':screen_front_desk,'notes':screen_notes},KEY,MODEL)

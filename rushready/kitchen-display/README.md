@@ -1,4 +1,4 @@
-# RushReady Kitchen Display: Smart Food Prioritizer + Digital Kitchen Tickets
+# BREADY Kitchen Display: Smart Food Prioritizer + Digital Kitchen Tickets
 
 A browser prototype of a kitchen display. Tickets are ranked by **how urgently each order needs to start**, not by when it arrived. Every modifier and allergy must be **confirmed by a named person** (by tap or by voice) before the order can be marked Ready.
 

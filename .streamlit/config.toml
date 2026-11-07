@@ -1,0 +1,12 @@
+# BREADY — Streamlit-level theme. Keep primaryColor equal to TOKENS['accent'] in ui/theme.py.
+# (The Lexend font itself is loaded by ui/theme.py with a Google Fonts @import, scoped to the app.)
+[theme]
+base = "light"
+primaryColor = "#A94F28"        # BREADY red: primary buttons, selected states
+backgroundColor = "#F7F6F2"     # white
+secondaryBackgroundColor = "#F6F6F6"
+textColor = "#1D2227"           # Cod Gray
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"   # hides the Deploy button so the compact top bar owns the top of the screen

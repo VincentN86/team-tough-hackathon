@@ -1,4 +1,4 @@
-"""SHARED DESIGN SYSTEM for BREDDY (Kitchen + Front Desk + landing).  Owner: main BREDDY UI (shell).  Not a feature package.
+"""SHARED DESIGN SYSTEM for BREADY (Kitchen + Front Desk + landing).  Owner: main BREADY UI (shell).  Not a feature package.
 
 One place for design tokens + the global compact-tablet CSS. Features may *use* the CSS variables (e.g. `var(--rr-late, #b42318)`)
 but must not import this file, so every feature stays independently runnable. (The `--rr-` prefix is an internal name, kept so nothing breaks.)
@@ -17,7 +17,7 @@ WHERE TO EDIT
 Semantic colours (never the brand red, so a warning is not mistaken for a primary action):
     late = deep crimson, blocked = Cod Gray fill, risk = amber, ok = green, info/tentative = neutral grey (tentative is dashed).
 Every status also carries a TEXT label, so colour is never the only signal.
-Contrast: Cod Gray on white 17:1. White on BREDDY red is 3.7:1, so red buttons use bold 17px+ text (WCAG "large text" 3:1); small text never uses brand red.
+Contrast: Cod Gray on white 17:1. White on BREADY red is 3.7:1, so red buttons use bold 17px+ text (WCAG "large text" 3:1); small text never uses brand red.
 """
 import re
 from datetime import datetime, timezone
@@ -25,8 +25,8 @@ from datetime import datetime, timezone
 import streamlit as st
 
 TOKENS = {
-    'bg': '#ffffff', 'panel': '#ffffff', 'surface': '#f6f6f6', 'line': '#e4e4e4', 'text': '#191919', 'muted': '#5f5f5f',
-    'accent': '#ff3008', 'accent-hover': '#d92806', 'accent-tint': '#ffece8', 'focus': '#191919',
+    'bg': '#f7f6f2', 'panel': '#ffffff', 'surface': '#f6f6f6', 'line': '#e4e4e4', 'text': '#1d2227', 'muted': '#5f5f5f',
+    'accent': '#a94f28', 'accent-hover': '#914222', 'accent-tint': '#f4e8dc', 'focus': '#191919',
     'late': '#b42318', 'late-bg': '#fee4e2',
     'blocked': '#ffffff', 'blocked-bg': '#191919',
     'risk': '#93370d', 'risk-bg': '#fef0c7',
@@ -125,7 +125,7 @@ button:disabled{opacity:.45;}
 /* ---------- TABLET WORKSPACE: panes fill the viewport height so the PAGE itself does not scroll ----------
    Only when the screen is at least 900px wide AND 560px tall. Smaller screens fall back to normal page flow (nothing is clipped). */
 @media (min-width:900px) and (min-height:560px){
-  [data-testid="stMain"]{overflow:hidden;}
+  /* Page scrolling remains available if a pane or dialog needs more room. */
   [class*="st-key-rr_pane_"]{height:calc(100vh - 96px) !important;max-height:calc(100vh - 96px) !important;}
 }
 @media (max-width:900px){

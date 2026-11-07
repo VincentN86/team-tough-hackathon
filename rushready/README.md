@@ -1,4 +1,4 @@
-# BREDDY (formerly RushReady) — NOVA Front House Hackathon
+# BREADY (formerly BREADY) — NOVA Front House Hackathon
 
 A functional **demo** of unified restaurant order intake, deadline-based kitchen prioritization, a chef-to-server OpenRouter incident agent, and human-confirmed packing/handoff. No real DoorDash/Uber Eats connectivity, customer messaging, or trained preparation-time model is included.
 
