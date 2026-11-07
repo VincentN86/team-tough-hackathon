@@ -2,10 +2,10 @@
 # (The Lexend font itself is loaded by ui/theme.py with a Google Fonts @import, scoped to the app.)
 [theme]
 base = "light"
-primaryColor = "#A94F28"        # BREADY red: primary buttons, selected states
-backgroundColor = "#F7F6F2"     # white
-secondaryBackgroundColor = "#F6F6F6"
-textColor = "#1D2227"           # Cod Gray
+primaryColor = "#FF3008"        # BREADY red: primary buttons, selected states
+backgroundColor = "#EEEEEE"     # light-grey canvas; panels are white (see ui/theme.py LAYERS)
+secondaryBackgroundColor = "#E2E2E2"
+textColor = "#191919"           # Cod Gray
 font = "sans serif"
 
 [client]

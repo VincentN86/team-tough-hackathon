@@ -6,14 +6,14 @@ Streamlit has no resizable columns, so this is a tiny zero-height custom compone
 resizes the two columns live in the browser — nothing is sent to Python, so dragging never reruns the app or disturbs widgets/state.
 
 Limits: 340px minimum for the left pane, 300px for the right (see index.html). Below 900px wide the panes stack and the divider hides.
-The chosen ratio is saved in the browser (localStorage 'breddy_split_ratio').
+The chosen ratio is saved in the browser (localStorage 'bready_split_<left pane key>': each screen keeps its own width).
 """
 from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as components
 
-_splitter = components.declare_component('breddy_splitter', path=str(Path(__file__).parent / 'splitter'))
+_splitter = components.declare_component('bready_splitter', path=str(Path(__file__).parent / 'splitter'))
 
 
 def render_splitter(left_key, right_key, default=0.6, min_left=340, min_right=300):

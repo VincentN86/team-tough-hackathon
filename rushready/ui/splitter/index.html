@@ -21,24 +21,24 @@
   });
 
   var STYLE =
-    '.breddy-divider{position:fixed;z-index:60;width:24px;margin-left:-12px;cursor:col-resize;touch-action:none;display:flex;justify-content:center;outline:none;}' +
-    '.breddy-divider .bar{width:4px;height:100%;border-radius:2px;background:#d4d4d4;transition:background .12s,width .12s;}' +
-    '.breddy-divider:hover .bar,.breddy-divider.drag .bar{background:#ff3008;width:6px;}' +
-    '.breddy-divider:focus-visible .bar{background:#ff3008;box-shadow:0 0 0 3px #191919;}' +
-    '.breddy-divider .grip{position:absolute;top:50%;width:14px;height:44px;margin-top:-22px;border-radius:7px;background:#fff;border:1px solid #191919;' +
+    '.bready-divider{position:fixed;z-index:60;width:24px;margin-left:-12px;cursor:col-resize;touch-action:none;display:flex;justify-content:center;outline:none;}' +
+    '.bready-divider .bar{width:4px;height:100%;border-radius:2px;background:#d4d4d4;transition:background .12s,width .12s;}' +
+    '.bready-divider:hover .bar,.bready-divider.drag .bar{background:#ff3008;width:6px;}' +
+    '.bready-divider:focus-visible .bar{background:#ff3008;box-shadow:0 0 0 3px #191919;}' +
+    '.bready-divider .grip{position:absolute;top:50%;width:14px;height:44px;margin-top:-22px;border-radius:7px;background:#fff;border:1px solid #191919;' +
     'display:flex;align-items:center;justify-content:center;gap:2px;}' +
-    '.breddy-divider .grip i{display:block;width:2px;height:16px;background:#191919;border-radius:1px;}';
+    '.bready-divider .grip i{display:block;width:2px;height:16px;background:#191919;border-radius:1px;}';
 
   function start() {
-    var KEY = 'breddy_split_ratio', DEF = cfg.default || 0.6, MIN_LEFT = cfg.minLeft || 340, MIN_RIGHT = cfg.minRight || 300, STEP = 0.02, NARROW = 900;
+    var KEY = 'bready_split_' + cfg.left, DEF = cfg.default || 0.6, MIN_LEFT = cfg.minLeft || 340, MIN_RIGHT = cfg.minRight || 300, STEP = 0.02, NARROW = 900;
     var ratio = DEF;
     try { var saved = parseFloat(W.localStorage.getItem(KEY)); if (saved > 0.2 && saved < 0.8) ratio = saved; } catch (x) {}
     var dragging = false, div = null;
 
-    if (!P.getElementById('breddy-split-style')) {
-      var st = P.createElement('style'); st.id = 'breddy-split-style'; st.textContent = STYLE; P.head.appendChild(st);
+    if (!P.getElementById('bready-split-style')) {
+      var st = P.createElement('style'); st.id = 'bready-split-style'; st.textContent = STYLE; P.head.appendChild(st);
     }
-    P.querySelectorAll('.breddy-divider').forEach(function (n) { n.remove(); });   // never keep a stale divider from an earlier run
+    P.querySelectorAll('.bready-divider').forEach(function (n) { n.remove(); });   // never keep a stale divider from an earlier run
 
     function parts() {
       var l = P.querySelector('.st-key-' + cfg.left), r = P.querySelector('.st-key-' + cfg.right);
@@ -80,7 +80,7 @@
 
     function build() {
       var d = P.createElement('div');
-      d.className = 'breddy-divider'; d.tabIndex = 0;
+      d.className = 'bready-divider'; d.tabIndex = 0;
       d.setAttribute('role', 'separator'); d.setAttribute('aria-orientation', 'vertical');
       d.setAttribute('aria-label', 'Resize panels. Use left and right arrow keys.');
       d.setAttribute('aria-valuemin', '20'); d.setAttribute('aria-valuemax', '80');

@@ -1,6 +1,7 @@
 """INTEGRATED tests: the real app.py (landing + shell + Front Desk + Vincent's screens + Feature 3) driven headlessly with AppTest.
 Run: python -m pytest tests/test_integration.py -q   (no browser needed; the microphone and the CSS/layout can't be tested here —
 see the browser checks described in TEAM_INTEGRATION_GUIDE.md)"""
+import re
 import sys
 from pathlib import Path
 
@@ -60,7 +61,7 @@ def test_full_workflow(tmp_path):
     click(at, 'Enter Kitchen')
     assert not at.exception and role(at) == 'kitchen'
     t = texts(at)
-    assert 'Priority 1' in t and 'Voice Communication' in t
+    assert 'Kitchen Tickets' in t and 'Voice Communication' in t
     assert 'BREADY' in t and 'RushReady' not in t                    # rebrand
     assert 'Incoming orders' not in [b.label for b in at.button]      # no separate navigation: it is a collapsed section now
     assert not at.get('button_group') or all(g.options != ['Queue', 'Even', 'Voice'] for g in at.get('button_group'))   # layout selector is gone
@@ -95,8 +96,9 @@ def test_full_workflow(tmp_path):
     # 6) unaffected order 1044: kitchen marks both items ready, then the Front Desk packs it from the order row
     click(at, 'Switch to Kitchen')
     items = [i for o in database.fetch_orders() if o['id'] == '1044' for i in o['items']]
+    press(at, 'tk_open_1044')                                        # open that ticket's tab, then mark its items ready
     for it in items:
-        press(at, f"ready_{it['id']}")
+        press(at, f"tk_ready_{it['id']}")
     click(at, 'Switch to Front Desk')
     assert 'Pack now' in texts(at)
     press(at, 'rr_open_1044')                                        # focused packing view opens in the same pane
@@ -190,13 +192,36 @@ def test_busy_shift_many_orders_and_alerts(tmp_path):
     assert 'Awaiting food' in texts(at)
 
 
-def test_individual_ticket_keeps_shared_workflow(tmp_path):
+def tab_ids(at):
+    return [re.search(r"tk-no'>#(\d+)<", m.value).group(1) for m in at.markdown if "class='tk-paper tk-tab" in m.value]
+
+
+def selected_tab(at):
+    return [re.search(r"tk-no'>#(\d+)<", m.value).group(1) for m in at.markdown if "class='tk-paper tk-tab sel" in m.value][0]
+
+
+def test_ticket_tabs_follow_priority_keep_selection_and_work(tmp_path):
+    from scheduler import schedule
     at = boot(tmp_path)
     click(at, 'Enter Kitchen')
-    at.selectbox(key='kitchen_ticket_picker').select('1044').run()
     assert not at.exception
-    item = next(o for o in database.fetch_orders() if o['id'] == '1044')['items'][0]
-    press(at, f"bt_start_{item['id']}")
-    assert next(o for o in database.fetch_orders() if o['id'] == '1044')['status'] == 'cooking'
-    press(at, f"bt_ready_{item['id']}")
-    assert next(o for o in database.fetch_orders() if o['id'] == '1044')['items'][0]['status'] == 'ready'
+    expected = [str(r['id']) for r in schedule(database.fetch_orders(), database.fetch_incidents())]
+    before = tab_ids(at)
+    assert before == expected                                        # tabs = existing priority order, highest first
+    assert selected_tab(at) == before[0]                             # nothing chosen yet: the top-priority ticket is open
+    press(at, 'tk_open_1045')                                        # choose a different ticket by tapping its tab
+    assert selected_tab(at) == '1045' and any('#1045' in m.value and 'bt-head' in m.value for m in at.markdown)
+    report_box(at).set_value('The fryer is thirty minutes behind')   # a chef report reprioritises the queue
+    click(at, 'Send')
+    after = tab_ids(at)
+    assert after == [str(r['id']) for r in schedule(database.fetch_orders(), database.fetch_incidents())]
+    assert after != before                                           # the order really changed...
+    assert selected_tab(at) == '1045' and at.session_state['open_ticket'] == '1045'   # ...but the open ticket is still the same ORDER
+    # details show real data and a working action
+    detail = ' '.join(m.value for m in at.markdown if 'bt-head' in m.value or 'bt-item' in m.value)
+    assert 'Pizza' in detail and 'Extra cheese' in detail and 'Est. ready' in detail
+    item = [i for o in database.fetch_orders() if o['id'] == '1045' for i in o['items']][0]
+    press(at, f"tk_start_{item['id']}")
+    assert [i for o in database.fetch_orders() if o['id'] == '1045' for i in o['items']][0]['status'] == 'cooking'
+    press(at, 'tk_open_1044')                                        # allergy ticket: the allergy warning is on the opened ticket
+    assert any('ALLERGY: Nut allergy' in m.value for m in at.markdown)

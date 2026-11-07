@@ -18,7 +18,7 @@ STATUS_LABEL = {'new': 'New', 'acknowledged': 'Acknowledged', 'customer_contacte
 
 CSS = '''<style>
 /* ---- alert card (front desk) ---- */
-.rra{border-left:4px solid var(--rr-line,#e3e1db);padding:6px 12px;background:var(--rr-panel,#fff);border-radius:0 8px 8px 0;margin:0 0 1rem}   /* 1rem bottom: Streamlit markdown has margin-bottom:-1rem */
+.rra{border-left:4px solid var(--rr-line,#e3e1db);padding:6px 12px;background:var(--rr-surface,#f5f5f5);border:1px solid var(--rr-line,#c9c9c9);border-left-width:4px;border-radius:0 8px 8px 0;margin:0 0 1rem}   /* 1rem bottom: Streamlit markdown has margin-bottom:-1rem */
 .rra.sev-urgent{border-left-color:var(--rr-blocked-bg,#1f2937)}
 .rra.sev-delayed{border-left-color:var(--rr-late,#b42318)}
 .rra.sev-watch{border-left-color:var(--rr-risk,#93370d)}

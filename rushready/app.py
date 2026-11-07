@@ -11,7 +11,6 @@ from database import (MENU,SOURCES,RECIPIENTS,STATIONS,init_db,reset_demo,create
 from scheduler import schedule,batch_hints
 from ai_agent import parse_issue,transcribe_wav,inspect_packing_photo
 from intake import render_intake
-from tickets import render_tickets
 from roles import ensure_role_selected,run_app          # role-based navigation (integration layer)
 from features.communication import reset_feature_data   # Feature 3 (Liz): clears its tables on demo reset
 
@@ -305,5 +304,5 @@ def screen_notes():  # was: with tabs[4]
 
 
 # ---- ROLE-BASED APP: Kitchen vs Front Desk (see roles.py). Feature 3 is plugged in there. ----
-run_app({'cook':screen_cook,'tickets':render_tickets,'legacy_agent':screen_legacy_agent,'intake':screen_intake,'packer':screen_packer,
+run_app({'cook':screen_cook,'legacy_agent':screen_legacy_agent,'intake':screen_intake,'packer':screen_packer,
          'front_desk':screen_front_desk,'notes':screen_notes},KEY,MODEL)
